@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图片上传测试</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 480px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    h1 { font-size: 1.25rem; margin-bottom: 1.5rem; }
+    .upload-zone {
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: #666;
+      background: #f8f8f8;
+    }
+    .upload-zone input { display: none; }
+    .preview {
+      margin-top: 1rem;
+      max-height: 200px;
+      border-radius: 6px;
+      display: none;
+    }
+    .preview.visible { display: block; }
+    button {
+      margin-top: 1rem;
+      padding: .5rem 1.5rem;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    button:hover { background: #555; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .result {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #f0f9ff;
+      border-radius: 8px;
+      display: none;
+    }
+    .result.visible { display: block; }
+    .result a {
+      color: #0284c7;
+      word-break: break-all;
+    }
+    .result img { max-width: 100%; border-radius: 6px; margin-top: .5rem; }
+    .error { background: #fef2f2; color: #b91c1c; }
+
+    .images-panel {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    .images-header {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .75rem;
+      flex-wrap: wrap;
+    }
+    .images-header input[type="date"] {
+      padding: .25rem .5rem;
+      border-radius: 4px;
+      border: 1px solid #d1d5db;
+      font-size: .9rem;
+    }
+    .images-list {
+      font-size: .9rem;
+      max-height: 320px;
+      overflow: auto;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+      padding: .5rem;
+    }
+    .images-date {
+      font-weight: 600;
+      margin-top: .5rem;
+      margin-bottom: .25rem;
+    }
+    .image-item {
+      display: flex;
+      flex-direction: column;
+      padding: .25rem 0;
+      border-top: 1px solid #f3f4f6;
+    }
+    .image-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+    .image-path {
+      flex: 1;
+      word-break: break-all;
+    }
+    .image-actions {
+      display: flex;
+      gap: .25rem;
+    }
+    .image-actions button {
+      margin-top: 0;
+      padding: .25rem .5rem;
+      font-size: .75rem;
+    }
+    .image-meta {
+      color: #6b7280;
+      font-size: .75rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>图片上传测试</h1>
+  <form id="form">
+    <label class="upload-zone" id="zone">
+      <input type="file" id="file" name="file" accept="image/jpeg,image/png,image/gif,image/webp">
+      <span id="hint">点击或拖拽图片到此处</span>
+      <img class="preview" id="preview" alt="">
+    </label>
+    <button type="submit" id="btn" disabled>上传</button>
+  </form>
+  <div class="result" id="result"></div>
+
+  <div class="images-panel">
+    <div class="images-header">
+      <strong>图片列表</strong>
+      <input type="date" id="dateFilter">
+      <button type="button" id="refreshImages">刷新</button>
+    </div>
+    <div class="images-list" id="imagesList"></div>
+  </div>
+
+  <script>
+    const zone = document.getElementById('zone');
+    const fileInput = document.getElementById('file');
+    const preview = document.getElementById('preview');
+    const hint = document.getElementById('hint');
+    const btn = document.getElementById('btn');
+    const result = document.getElementById('result');
+    const form = document.getElementById('form');
+    const dateFilter = document.getElementById('dateFilter');
+    const refreshImagesBtn = document.getElementById('refreshImages');
+    const imagesList = document.getElementById('imagesList');
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) fileInput.files = e.dataTransfer.files;
+      updatePreview();
+    });
+    fileInput.addEventListener('change', updatePreview);
+
+    function updatePreview() {
+      const f = fileInput.files[0];
+      btn.disabled = !f;
+      if (!f) {
+        preview.classList.remove('visible');
+        hint.textContent = '点击或拖拽图片到此处';
+        return;
+      }
+      hint.textContent = f.name;
+      preview.src = URL.createObjectURL(f);
+      preview.classList.add('visible');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = fileInput.files[0];
+      if (!f) return;
+
+      btn.disabled = true;
+      btn.textContent = '上传中...';
+      result.classList.remove('visible');
+
+      const fd = new FormData();
+      fd.append('file', f);
+
+      try {
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        result.className = 'result visible';
+        if (res.ok) {
+          result.classList.remove('error');
+          result.innerHTML = `
+            <strong>图片地址：</strong><br>
+            <a href="${data.url}" target="_blank">${data.url}</a><br>
+            <img src="${data.url}" alt="上传的图片">
+          `;
+          await loadImages();
+        } else {
+          result.classList.add('error');
+          result.textContent = data.error || '上传失败';
+        }
+      } catch (err) {
+        result.className = 'result visible error';
+        result.textContent = '请求失败: ' + err.message;
+      }
+      btn.disabled = false;
+      btn.textContent = '上传';
+    });
+
+    refreshImagesBtn.addEventListener('click', () => {
+      loadImages();
+    });
+
+    dateFilter.addEventListener('change', () => {
+      loadImages();
+    });
+
+    async function loadImages() {
+      const params = new URLSearchParams();
+      if (dateFilter.value) {
+        params.set('date', dateFilter.value);
+      }
+      const qs = params.toString();
+      const url = '/images' + (qs ? ('?' + qs) : '');
+      imagesList.textContent = '加载中...';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          imagesList.textContent = '加载失败：' + res.status;
+          return;
+        }
+        const data = await res.json();
+        renderImages(data);
+      } catch (e) {
+        imagesList.textContent = '加载失败：' + e.message;
+      }
+    }
+
+    function renderImages(groups) {
+      if (!groups || !groups.length) {
+        imagesList.textContent = '暂无图片';
+        return;
+      }
+      imagesList.innerHTML = '';
+      for (const group of groups) {
+        const dateEl = document.createElement('div');
+        dateEl.className = 'images-date';
+        dateEl.textContent = group.date;
+        imagesList.appendChild(dateEl);
+
+        for (const img of group.files) {
+          const item = document.createElement('div');
+          item.className = 'image-item';
+
+          const main = document.createElement('div');
+          main.className = 'image-main';
+
+          const pathSpan = document.createElement('div');
+          pathSpan.className = 'image-path';
+          pathSpan.textContent = img.path;
+
+          const actions = document.createElement('div');
+          actions.className = 'image-actions';
+
+          const openBtn = document.createElement('button');
+          openBtn.type = 'button';
+          openBtn.textContent = '打开';
+          openBtn.onclick = () => window.open(img.url, '_blank');
+
+          const copyBtn = document.createElement('button');
+          copyBtn.type = 'button';
+          copyBtn.textContent = '复制链接';
+          copyBtn.onclick = async () => {
+            try {
+              await navigator.clipboard.writeText(img.url);
+              copyBtn.textContent = '已复制';
+              setTimeout(() => (copyBtn.textContent = '复制链接'), 1500);
+            } catch {
+              alert('复制失败，可以手动选择链接复制');
+            }
+          };
+
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = '删除';
+          delBtn.onclick = async () => {
+            if (!confirm('确定删除这张图片吗？\n' + img.path)) return;
+            try {
+              const res = await fetch('/images?path=' + encodeURIComponent(img.path), { method: 'DELETE' });
+              if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                alert('删除失败：' + (data.error || res.status));
+                return;
+              }
+              await loadImages();
+            } catch (e) {
+              alert('删除失败：' + e.message);
+            }
+          };
+
+          actions.appendChild(openBtn);
+          actions.appendChild(copyBtn);
+          actions.appendChild(delBtn);
+
+          main.appendChild(pathSpan);
+          main.appendChild(actions);
+
+          const meta = document.createElement('div');
+          meta.className = 'image-meta';
+          meta.textContent = '大小：' + formatSize(img.size);
+
+          item.appendChild(main);
+          item.appendChild(meta);
+          imagesList.appendChild(item);
+        }
+      }
+    }
+
+    function formatSize(size) {
+      const KB = 1024;
+      const MB = 1024 * KB;
+      const GB = 1024 * MB;
+      if (size >= GB) return (size / GB).toFixed(2) + ' GB';
+      if (size >= MB) return (size / MB).toFixed(2) + ' MB';
+      if (size >= KB) return (size / KB).toFixed(2) + ' KB';
+      return size + ' B';
+    }
+
+    // 默认加载今天的日期列表
+    (function init() {
+      const today = new Date().toISOString().slice(0, 10);
+      dateFilter.value = today;
+      loadImages();
+    })();
+  </script>
+</body>
+</html>

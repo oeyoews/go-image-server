@@ -1,0 +1,5 @@
+uploads/
+*.exe
+test.png
+*.swp
+bin/

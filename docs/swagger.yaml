@@ -1,0 +1,133 @@
+basePath: /
+definitions:
+  handler.ImageFile:
+    properties:
+      name:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+    type: object
+  handler.ImageGroup:
+    properties:
+      date:
+        type: string
+      files:
+        items:
+          $ref: '#/definitions/handler.ImageFile'
+        type: array
+    type: object
+  handler.UploadResponse:
+    properties:
+      path:
+        type: string
+      url:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Local image upload and management service.
+  title: Go Image Server API
+  version: "1.0"
+paths:
+  /images:
+    delete:
+      description: 通过相对路径删除图片，path 形如 2026-03-14/xxx.png
+      parameters:
+      - description: 相对路径(YYYY-MM-DD/xxx.png)
+        in: query
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 删除图片
+      tags:
+      - images
+    get:
+      description: 按日期分组返回图片列表，可通过 date=YYYY-MM-DD 过滤
+      parameters:
+      - description: 日期(YYYY-MM-DD)
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ImageGroup'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 图片列表
+      tags:
+      - images
+  /upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传一张图片并返回访问地址
+      parameters:
+      - description: 图片文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.UploadResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 上传图片
+      tags:
+      - images
+swagger: "2.0"
