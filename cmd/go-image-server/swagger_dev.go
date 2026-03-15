@@ -32,3 +32,4 @@ func registerSwagger(r *gin.Engine, isDev bool) {
 		ginSwagger.DefaultModelsExpandDepth(-1),
 	))
 }
+

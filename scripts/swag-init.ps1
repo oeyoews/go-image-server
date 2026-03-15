@@ -1,5 +1,5 @@
 param(
-    [string]$MainFile = "main.go",
+    [string]$MainFile = "cmd/go-image-server/main.go",
     [string]$OutputDir = "docs"
 )
 

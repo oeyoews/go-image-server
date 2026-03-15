@@ -19,7 +19,7 @@
 - [Gin](https://github.com/gin-gonic/gin) - HTTP 框架
 - [logrus](https://github.com/sirupsen/logrus) - 日志
 - [gin-contrib/cors](https://github.com/gin-contrib/cors) - 跨域
-- **Web 页**：Vue 3、Tailwind CSS（CDN），单文件 `static/index.html`，浅色主题
+- **Web 页**：Vue 3、Tailwind CSS（CDN），单文件 `web/index.html`，浅色主题
 
 ## 快速开始
 
@@ -32,8 +32,10 @@ go mod download
 ### 运行
 
 ```bash
-go run .
+go run ./cmd/go-image-server
 ```
+
+或使用 Go Modules 安装后直接运行可执行文件。
 
 默认监听 `http://localhost:48083`。首次运行会在配置目录生成默认 `config.json`（见下方配置说明）。
 
@@ -66,12 +68,13 @@ make build-all
 2. 用户配置目录：`$XDG_CONFIG_HOME/go-image-server/config.json`（Linux/macOS）或 `%AppData%\go-image-server\config.json`（Windows）
 3. 当前目录 `config.json`
 
-示例 `config.example.json`：
+示例 `config.example.json`（仓库内 `configs/config.example.json`）：
 
 ```json
 {
   "port": "48083",
-  "upload_dir": ""
+  "upload_dir": "",
+  "open_browser": true
 }
 ```
 
@@ -107,7 +110,7 @@ make build-all
 | GET    | `/api/v1/images`  | 图片列表，可选 query `date=YYYY-MM-DD` |
 | DELETE | `/api/v1/images`  | 删除图片，query `path=YYYY-MM-DD/xxx.png` |
 | GET    | `/files/*`        | 静态访问，对应上传目录中的文件 |
-| GET    | `/`               | Web 上传页（`static/index.html`） |
+| GET    | `/`               | Web 上传页（`web/index.html`） |
 
 ### 上传示例
 
@@ -148,28 +151,38 @@ curl -X DELETE "http://localhost:48083/api/v1/images?path=2026-03-15/my-image.pn
 
 ## 项目结构
 
+基于 [Go 项目标准布局](https://raw.githubusercontent.com/golang-standards/project-layout/master/README_zh-CN.md) 进行组织：
+
 ```
 go-image-server/
-├── main.go              # 入口、配置加载、路由
-├── go.mod / go.sum      # Go 模块与依赖
-├── Makefile             # 构建（含多平台）
-├── build.ps1            # Windows 单平台构建
-├── build-all.ps1        # Windows 多平台构建
-├── swag-init.ps1        # 生成 Swagger 文档（swag init）
-├── static/
-│   └── index.html       # Web 上传页（Vue3 + Tailwind CDN）
-├── internal/
+├── cmd/
+│   └── go-image-server/   # 主应用入口
+│       ├── main.go        # 入口、配置加载、路由
+│       ├── swagger_dev.go # dev 构建下的 Swagger UI
+│       └── swagger_stub.go# 非 dev 构建的空实现
+├── internal/              # 私有应用代码
 │   ├── handler/
-│   │   ├── upload.go    # 上传/列表/删除/Info 处理
-│   │   └── response.go  # 统一响应格式
+│   │   ├── upload.go      # 上传/列表/删除/Info 处理
+│   │   └── response.go    # 统一响应格式
 │   ├── storage/
-│   │   └── local.go     # 本地存储、按日期目录、安全路径
+│   │   └── local.go       # 本地存储、按日期目录、安全路径
 │   └── shortid/
-│       └── shortid.go   # Base62 短 ID（可选用途）
-└── docs/
-    ├── docs.go          # API 文档（swag 生成）
-    ├── swagger.json     # Swagger 2.0 JSON
-    └── swagger.yaml     # Swagger 2.0 YAML
+│       └── shortid.go     # Base62 短 ID（可选用途）
+├── configs/
+│   └── config.example.json# 配置示例
+├── docs/                  # Swagger 文档
+│   ├── docs.go
+│   ├── swagger.json
+│   └── swagger.yaml
+├── web/
+│   └── index.html         # Web 上传页（Vue3 + Tailwind CDN）
+├── scripts/               # 构建与工具脚本
+│   ├── build.ps1          # Windows 单平台构建
+│   ├── build-all.ps1      # Windows 多平台构建
+│   └── swag-init.ps1      # 生成 Swagger 文档
+├── Makefile               # 多平台构建（使用 ./cmd/go-image-server）
+├── go.mod / go.sum        # Go 模块与依赖
+└── README.md
 ```
 
 ## 安全说明

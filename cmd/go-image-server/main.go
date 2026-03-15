@@ -226,7 +226,7 @@ func main() {
 	registerSwagger(r, isDev)
 
 	// 原版上传页：Vue3 + Tailwind CDN，同 neotw-image-upload 插件功能
-	r.GET("/", func(c *gin.Context) { c.File("static/index.html") })
+	r.GET("/", func(c *gin.Context) { c.File("web/index.html") })
 
 	port := cfg.Port
 	if port == "" {
@@ -267,3 +267,4 @@ func main() {
 		break
 	}
 }
+

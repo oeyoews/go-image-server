@@ -35,9 +35,9 @@ foreach ($goos in $GOOS_LIST) {
         $env:GOOS = $goos
         $env:GOARCH = $goarch
         if ($NoCompress) {
-            go build -trimpath -o $outPath .
+            go build -trimpath -o $outPath ./cmd/$BinaryName
         } else {
-            go build -trimpath -ldflags $LDFLAGS -o $outPath .
+            go build -trimpath -ldflags $LDFLAGS -o $outPath ./cmd/$BinaryName
         }
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Build failed: $goos/$goarch"
@@ -48,3 +48,4 @@ foreach ($goos in $GOOS_LIST) {
 
 Write-Host "==> Build-all succeeded. Output: $OutputDir" -ForegroundColor Green
 Get-ChildItem $OutputDir | ForEach-Object { Write-Host "    $($_.Name)" }
+

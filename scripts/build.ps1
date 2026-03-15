@@ -16,15 +16,15 @@ New-Item -ItemType Directory -Path $OutputDir | Out-Null
 Write-Host "==> Running go mod tidy..." -ForegroundColor Cyan
 go mod tidy
 
-Write-Host "==> Building project..." -ForegroundColor Cyan
+Write-Host "==> Building project (cmd/go-image-server)..." -ForegroundColor Cyan
 $env:CGO_ENABLED = "0"
 if ($NoCompress) {
     Write-Host "==> Compression disabled (NoCompress)..." -ForegroundColor Yellow
-    go build -o (Join-Path $OutputDir "$BinaryName.exe") .
+	go build -o (Join-Path $OutputDir "$BinaryName.exe") ./cmd/$BinaryName
 } else {
     $ldflags = "-s -w"
     Write-Host "==> Using ldflags '$ldflags' with -trimpath for smaller binary..." -ForegroundColor Cyan
-    go build -trimpath -ldflags $ldflags -o (Join-Path $OutputDir "$BinaryName.exe") .
+	go build -trimpath -ldflags $ldflags -o (Join-Path $OutputDir "$BinaryName.exe") ./cmd/$BinaryName
 }
 
 if ($LASTEXITCODE -ne 0) {
@@ -41,3 +41,4 @@ if (Test-Path $binPath) {
     $sizeMB = $sizeBytes / 1MB
     Write-Host ("==> Binary size: {0:N2} MB ({1} bytes)" -f $sizeMB, $sizeBytes) -ForegroundColor Green
 }
+
