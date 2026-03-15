@@ -170,7 +170,7 @@ go-image-server/
 │       └── shortid.go     # Base62 短 ID（可选用途）
 ├── configs/
 │   └── config.example.json# 配置示例
-├── docs/                  # Swagger 文档
+├── api/                   # API 规范（Swagger 文档等）
 │   ├── docs.go
 │   ├── swagger.json
 │   └── swagger.yaml

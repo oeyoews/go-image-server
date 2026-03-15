@@ -3,7 +3,7 @@
 package main
 
 import (
-	"go-image-server/docs"
+	"go-image-server/api"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -20,8 +20,8 @@ func registerSwagger(r *gin.Engine, isDev bool) {
 	// docs.SwaggerInfo.Title = "Go Image Server API"
 	// docs.SwaggerInfo.Description = "本地图片上传与管理服务的开发文档。"
 	// docs.SwaggerInfo.Version = Version
-	docs.SwaggerInfo.BasePath = "/api/v1"
-	docs.SwaggerInfo.Schemes = []string{"http"}
+	api.SwaggerInfo.BasePath = "/api/v1"
+	api.SwaggerInfo.Schemes = []string{"http"}
 
 	// /swagger/index.html
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(

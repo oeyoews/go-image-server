@@ -1,6 +1,6 @@
 param(
     [string]$MainFile = "cmd/go-image-server/main.go",
-    [string]$OutputDir = "docs"
+    [string]$OutputDir = "api"
 )
 
 Set-StrictMode -Version Latest
