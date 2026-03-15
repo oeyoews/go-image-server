@@ -204,7 +204,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Go Image Server API",
-	Description:      "Local image upload and management service.",
+	Description:      "本地图片上传与管理服务的开发文档。",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

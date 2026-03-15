@@ -2,6 +2,10 @@ param(
     [string]$Port
 )
 
+# 先生成 Swagger 文档（docs/docs.go、swagger.yaml/json）
+Write-Host "==> Generating Swagger docs (swag-init.ps1)..." -ForegroundColor Cyan
+.\swag-init.ps1
+
 # 设置开发环境
 $env:APP_ENV = "dev"
 

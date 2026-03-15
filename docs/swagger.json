@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Local image upload and management service.",
+        "description": "本地图片上传与管理服务的开发文档。",
         "title": "Go Image Server API",
         "contact": {},
         "version": "1.0"

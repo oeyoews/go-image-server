@@ -2,7 +2,7 @@ package main
 
 // @title           Go Image Server API
 // @version         1.0
-// @description     Local image upload and management service.
+// @description     本地图片上传与管理服务的开发文档。
 // @BasePath        /api/v1
 
 import (

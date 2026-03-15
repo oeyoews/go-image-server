@@ -14,7 +14,7 @@ if (-not $swag) {
 }
 
 Write-Host "==> Running 'swag init'..." -ForegroundColor Cyan
-swag init -g $MainFile -o $OutputDir --outputTypes "yaml,json"
+swag init -g $MainFile -o $OutputDir --outputTypes "go,yaml,json"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "swag init 失败，退出码: $LASTEXITCODE"
