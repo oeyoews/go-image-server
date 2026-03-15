@@ -205,7 +205,9 @@ func main() {
 	for i := 0; i < maxTries; i++ {
 		p := basePort + i
 		addr := fmt.Sprintf(":%d", p)
+		uploadPageURL := fmt.Sprintf("http://localhost:%d/", p)
 		log.WithField("port", p).Info("Server starting")
+		log.WithField("url", uploadPageURL).Info("Web upload page")
 		if err := r.Run(addr); err != nil {
 			msg := err.Error()
 			if strings.Contains(msg, "address already in use") || strings.Contains(msg, "Only one usage of each socket address") {

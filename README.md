@@ -1,15 +1,16 @@
 # Go Image Server
 
-本地图片上传与管理服务，基于 Gin 的轻量级 HTTP 服务，支持上传、列表、删除与静态访问图片。
+本地图片上传与管理服务，基于 Gin 的轻量级 HTTP 服务，支持 Web 上传页、REST API、按日期存储与静态访问。
 
 ## 功能特性
 
+- **Web 上传页**：浏览器打开根路径即可使用，Vue3 + Tailwind CSS（CDN），支持拖拽、粘贴（Ctrl+V）、修改保存名、复制 Markdown/Wikitext/链接、按日期查看与删除
 - **图片上传**：支持 JPG、PNG、GIF、WebP、BMP、SVG，单文件最大 5MB
-- **按日期存储**：自动按 `YYYY-MM-DD` 分目录保存，便于管理
+- **按日期存储**：自动按 `YYYY-MM-DD` 分目录保存
 - **静态访问**：通过 `/files/日期/文件名` 直接访问已上传图片
-- **图片列表**：按日期分组返回，支持 `?date=YYYY-MM-DD` 过滤
+- **图片列表**：按日期分组，支持 `?date=YYYY-MM-DD` 过滤
 - **删除图片**：通过相对路径删除指定图片
-- **CORS**：默认开启跨域，方便前端或 TiddlyWiki 等调用
+- **CORS**：默认开启跨域，便于前端或 TiddlyWiki 等调用
 - **端口自动递增**：若指定端口被占用，自动尝试下一端口（最多 10 次）
 
 ## 技术栈
@@ -18,6 +19,7 @@
 - [Gin](https://github.com/gin-gonic/gin) - HTTP 框架
 - [logrus](https://github.com/sirupsen/logrus) - 日志
 - [gin-contrib/cors](https://github.com/gin-contrib/cors) - 跨域
+- **Web 页**：Vue 3、Tailwind CSS（CDN），单文件 `static/index.html`，浅色主题
 
 ## 快速开始
 
@@ -34,6 +36,16 @@ go run .
 ```
 
 默认监听 `http://localhost:48083`。首次运行会在配置目录生成默认 `config.json`（见下方配置说明）。
+
+### Web 上传页
+
+启动后浏览器访问：
+
+```
+http://localhost:48083/
+```
+
+即可使用上传界面：选择/拖拽/粘贴图片、填写保存名、上传后复制 Markdown 或链接，并可查看按日期分组的图片列表、复制链接或删除。
 
 ### 使用 Make 构建
 
@@ -63,10 +75,10 @@ make build-all
 }
 ```
 
-| 字段        | 说明                          |
-|-------------|-------------------------------|
-| `port`      | 服务端口，默认 `48083`         |
-| `upload_dir` | 上传根目录，为空时见下方解析 |
+| 字段         | 说明                          |
+|--------------|-------------------------------|
+| `port`       | 服务端口，默认 `48083`         |
+| `upload_dir` | 上传根目录，为空时见下方解析  |
 
 **上传目录解析顺序**：
 
@@ -77,37 +89,44 @@ make build-all
 
 ## 环境变量
 
-| 变量           | 说明                    |
-|----------------|-------------------------|
-| `CONFIG_FILE`  | 配置文件路径            |
-| `UPLOAD_DIR`   | 上传根目录（覆盖配置）  |
-| `PORT`         | 服务端口（覆盖配置）    |
-| `LOG_LEVEL`    | 日志级别：debug/info/warn/error |
+| 变量          | 说明                     |
+|---------------|--------------------------|
+| `CONFIG_FILE` | 配置文件路径             |
+| `UPLOAD_DIR`  | 上传根目录（覆盖配置）   |
+| `PORT`        | 服务端口（覆盖配置）    |
+| `LOG_LEVEL`   | 日志级别：debug/info/warn/error |
 
 ## API 说明
 
-| 方法   | 路径       | 说明 |
-|--------|------------|------|
-| GET    | `/info`    | 返回 `upload_dir`、`config_file`，供前端展示 |
-| POST   | `/upload`  | 上传图片，form 字段 `file` 必填，可选 `filename` 指定保存名 |
-| GET    | `/images`  | 图片列表，可选 query `date=YYYY-MM-DD` |
-| DELETE | `/images`  | 删除图片，query `path=YYYY-MM-DD/xxx.png` |
-| GET    | `/files/*` | 静态文件，对应上传目录 |
+所有接口前缀为 **`/api/v1`**，响应格式统一为 `{ "code": number, "message": string, "data": ... }`。
+
+| 方法   | 路径              | 说明 |
+|--------|-------------------|------|
+| GET    | `/api/v1/info`    | 返回 `upload_dir`、`config_file`、`version` |
+| POST   | `/api/v1/upload`  | 上传图片，form 字段 `file` 必填，可选 `filename` 指定保存名 |
+| GET    | `/api/v1/images`  | 图片列表，可选 query `date=YYYY-MM-DD` |
+| DELETE | `/api/v1/images`  | 删除图片，query `path=YYYY-MM-DD/xxx.png` |
+| GET    | `/files/*`        | 静态访问，对应上传目录中的文件 |
+| GET    | `/`               | Web 上传页（`static/index.html`） |
 
 ### 上传示例
 
 ```bash
-curl -X POST http://localhost:48083/upload \
+curl -X POST http://localhost:48083/api/v1/upload \
   -F "file=@/path/to/image.png" \
   -F "filename=my-image.png"
 ```
 
-响应示例：
+响应示例（`data` 字段）：
 
 ```json
 {
-  "url": "http://localhost:48083/files/2026-03-15/my-image.png",
-  "path": "2026-03-15/my-image.png"
+  "code": 201,
+  "message": "success",
+  "data": {
+    "url": "http://localhost:48083/files/2026-03-15/my-image.png",
+    "path": "2026-03-15/my-image.png"
+  }
 }
 ```
 
@@ -115,16 +134,16 @@ curl -X POST http://localhost:48083/upload \
 
 ```bash
 # 全部
-curl http://localhost:48083/images
+curl http://localhost:48083/api/v1/images
 
 # 指定日期
-curl "http://localhost:48083/images?date=2026-03-15"
+curl "http://localhost:48083/api/v1/images?date=2026-03-15"
 ```
 
 ### 删除示例
 
 ```bash
-curl -X DELETE "http://localhost:48083/images?path=2026-03-15/my-image.png"
+curl -X DELETE "http://localhost:48083/api/v1/images?path=2026-03-15/my-image.png"
 ```
 
 ## 项目结构
@@ -132,19 +151,25 @@ curl -X DELETE "http://localhost:48083/images?path=2026-03-15/my-image.png"
 ```
 go-image-server/
 ├── main.go              # 入口、配置加载、路由
-├── config.example.json  # 配置示例
-├── go.mod / go.sum
+├── go.mod / go.sum      # Go 模块与依赖
 ├── Makefile             # 构建（含多平台）
+├── build.ps1            # Windows 单平台构建
+├── build-all.ps1        # Windows 多平台构建
+├── swag-init.ps1        # 生成 Swagger 文档（swag init）
+├── static/
+│   └── index.html       # Web 上传页（Vue3 + Tailwind CDN）
 ├── internal/
 │   ├── handler/
-│   │   └── upload.go    # 上传/列表/删除/Info 处理
+│   │   ├── upload.go    # 上传/列表/删除/Info 处理
+│   │   └── response.go  # 统一响应格式
 │   ├── storage/
-│   │   └── local.go    # 本地存储、按日期目录、安全路径
+│   │   └── local.go     # 本地存储、按日期目录、安全路径
 │   └── shortid/
-│       └── shortid.go  # Base62 短 ID（可选用途）
+│       └── shortid.go   # Base62 短 ID（可选用途）
 └── docs/
-    ├── swagger.yaml
-    └── swagger.json    # API 文档（swag 生成）
+    ├── docs.go          # API 文档（swag 生成）
+    ├── swagger.json     # Swagger 2.0 JSON
+    └── swagger.yaml     # Swagger 2.0 YAML
 ```
 
 ## 安全说明
