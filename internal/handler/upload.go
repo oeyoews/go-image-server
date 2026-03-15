@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"go-image-server/internal/storage"
@@ -14,11 +15,25 @@ import (
 )
 
 type UploadHandler struct {
-	storage *storage.LocalStorage
+	storage    *storage.LocalStorage
+	uploadDir  string
+	configPath string
 }
 
-func NewUploadHandler(s *storage.LocalStorage) *UploadHandler {
-	return &UploadHandler{storage: s}
+func NewUploadHandler(s *storage.LocalStorage, uploadDir, configPath string) *UploadHandler {
+	return &UploadHandler{storage: s, uploadDir: uploadDir, configPath: configPath}
+}
+
+// Info 返回服务端存储目录与配置文件路径，供前端展示。
+func (h *UploadHandler) Info(c *gin.Context) {
+	uploadDir := h.uploadDir
+	if abs, err := filepath.Abs(uploadDir); err == nil {
+		uploadDir = abs
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"upload_dir":   uploadDir,
+		"config_file":  h.configPath,
+	})
 }
 
 type UploadResponse struct {
