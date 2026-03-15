@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -28,10 +29,17 @@ type Config struct {
 	UploadDir string `json:"upload_dir"`
 }
 
+func getDefaultUploadDir() string {
+	if cacheDir, err := os.UserCacheDir(); err == nil && cacheDir != "" {
+		return filepath.Join(cacheDir, "go-image-server", "uploads")
+	}
+	return "./uploads"
+}
+
 func defaultConfig() Config {
 	return Config{
-		Port:      "8080",
-		UploadDir: "",
+		Port:      "48083",
+		UploadDir: getDefaultUploadDir(),
 	}
 }
 
@@ -76,7 +84,14 @@ func loadConfig() (Config, string) {
 
 	var cfg Config
 	if err := json.NewDecoder(f).Decode(&cfg); err != nil {
-		log.WithError(err).Errorf("failed to parse config file %s", path)
+		if errors.Is(err, io.EOF) {
+			log.WithField("path", path).Info("Config file is empty, re-initializing")
+			if err := writeDefaultConfig(path); err != nil {
+				log.WithError(err).Errorf("failed to write default config %s", path)
+			}
+		} else {
+			log.WithError(err).Errorf("failed to parse config file %s", path)
+		}
 		return defaultConfig(), path
 	}
 	return cfg, path
@@ -166,13 +181,13 @@ func main() {
 		if cfg.Port != "" {
 			port = cfg.Port
 		} else {
-			port = "8080"
+			port = "48083"
 		}
 	}
 
 	basePort, err := strconv.Atoi(port)
 	if err != nil || basePort <= 0 {
-		basePort = 8080
+		basePort = 48083
 	}
 
 	const maxTries = 10
