@@ -133,6 +133,7 @@ func setupLogger() {
 
 func main() {
 	setupLogger()
+	gin.SetMode(gin.ReleaseMode) // 关闭 [GIN-debug] 路由注册日志
 
 	cfg, cfgPath := loadConfig()
 	uploadDir := resolveUploadDir(cfg)
