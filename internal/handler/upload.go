@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,15 +23,27 @@ func NewUploadHandler(s *storage.LocalStorage, uploadDir, configPath string) *Up
 	return &UploadHandler{storage: s, uploadDir: uploadDir, configPath: configPath}
 }
 
-// Info 返回服务端存储目录与配置文件路径，供前端展示。
+// InfoResponse 服务信息响应
+type InfoResponse struct {
+	UploadDir  string `json:"upload_dir"`
+	ConfigFile string `json:"config_file"`
+}
+
+// Info godoc
+// @Summary      服务信息
+// @Description  返回服务端存储目录与配置文件路径，供前端展示
+// @Tags         info
+// @Produce      json
+// @Success      200  {object}  APIResponse
+// @Router       /info [get]
 func (h *UploadHandler) Info(c *gin.Context) {
 	uploadDir := h.uploadDir
 	if abs, err := filepath.Abs(uploadDir); err == nil {
 		uploadDir = abs
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"upload_dir":   uploadDir,
-		"config_file":  h.configPath,
+	respOK(c, InfoResponse{
+		UploadDir:  uploadDir,
+		ConfigFile: h.configPath,
 	})
 }
 
@@ -53,6 +64,11 @@ type ImageGroup struct {
 	Files []ImageFile `json:"files"`
 }
 
+// DeleteResult 删除接口成功时 data 字段
+type DeleteResult struct {
+	OK bool `json:"ok"`
+}
+
 // Upload godoc
 // @Summary      上传图片
 // @Description  上传一张图片并返回访问地址
@@ -61,25 +77,25 @@ type ImageGroup struct {
 // @Produce      json
 // @Param        file      formData  file  true   "图片文件"
 // @Param        filename  formData  string false "保存时的文件名（可选，上传前改名）"
-// @Success      200   {object}  UploadResponse
-// @Failure      400   {object}  map[string]string
-// @Failure      500   {object}  map[string]string
+// @Success      201  {object}  APIResponse
+// @Failure      400  {object}  APIError
+// @Failure      500  {object}  APIError
 // @Router       /upload [post]
 func (h *UploadHandler) Upload(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
+		respBadRequest(c, "missing file")
 		return
 	}
 
 	if file.Size > storage.MaxFileSize {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "file too large"})
+		respBadRequest(c, "file too large")
 		return
 	}
 
 	f, err := file.Open()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file"})
+		respServerError(c, "failed to read file")
 		return
 	}
 	defer f.Close()
@@ -91,7 +107,7 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 	}
 	relPath, err := h.storage.Save(f, saveName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respServerError(c, err.Error())
 		return
 	}
 
@@ -108,7 +124,7 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		"size":       humanSize,
 	}).Info("Image uploaded")
 
-	c.JSON(http.StatusOK, UploadResponse{
+	respCreated(c, UploadResponse{
 		URL:  url,
 		Path: relPath,
 	})
@@ -120,15 +136,15 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 // @Tags         images
 // @Produce      json
 // @Param        date  query  string  false  "日期(YYYY-MM-DD)"
-// @Success      200   {array}  ImageGroup
-// @Failure      500   {object}  map[string]string
+// @Success      200  {object}  APIResponse
+// @Failure      500  {object}  APIError
 // @Router       /images [get]
 func (h *UploadHandler) ListImages(c *gin.Context) {
 	date := c.Query("date")
 
 	groups, err := h.storage.ListByDate(date)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respServerError(c, err.Error())
 		return
 	}
 
@@ -158,7 +174,7 @@ func (h *UploadHandler) ListImages(c *gin.Context) {
 		return result[i].Date > result[j].Date
 	})
 
-	c.JSON(http.StatusOK, result)
+	respOK(c, result)
 }
 
 func formatSize(size int64) string {
@@ -185,28 +201,28 @@ func formatSize(size int64) string {
 // @Tags         images
 // @Produce      json
 // @Param        path  query  string  true  "相对路径(YYYY-MM-DD/xxx.png)"
-// @Success      200   {object}  map[string]bool
-// @Failure      400   {object}  map[string]string
-// @Failure      404   {object}  map[string]string
-// @Failure      500   {object}  map[string]string
+// @Success      200  {object}  APIResponse
+// @Failure      400  {object}  APIError
+// @Failure      404  {object}  APIError
+// @Failure      500  {object}  APIError
 // @Router       /images [delete]
 func (h *UploadHandler) DeleteImage(c *gin.Context) {
 	path := c.Query("path")
 	if path == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing path"})
+		respBadRequest(c, "missing path")
 		return
 	}
 
 	err := h.storage.Delete(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			respNotFound(c, "not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respServerError(c, err.Error())
 		return
 	}
 
 	log.WithField("path", path).Info("Image deleted")
-	c.JSON(http.StatusOK, gin.H{"ok": true})
+	respOK(c, DeleteResult{OK: true})
 }

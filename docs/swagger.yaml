@@ -1,30 +1,23 @@
 basePath: /
 definitions:
-  handler.ImageFile:
+  handler.APIError:
     properties:
-      name:
-        type: string
-      path:
-        type: string
-      size:
+      code:
+        example: 400
         type: integer
-      url:
+      data: {}
+      message:
+        example: missing path
         type: string
     type: object
-  handler.ImageGroup:
+  handler.APIResponse:
     properties:
-      date:
-        type: string
-      files:
-        items:
-          $ref: '#/definitions/handler.ImageFile'
-        type: array
-    type: object
-  handler.UploadResponse:
-    properties:
-      path:
-        type: string
-      url:
+      code:
+        example: 200
+        type: integer
+      data: {}
+      message:
+        example: success
         type: string
     type: object
 info:
@@ -48,27 +41,19 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: boolean
-            type: object
+            $ref: '#/definitions/handler.APIResponse'
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.APIError'
         "404":
           description: Not Found
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.APIError'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.APIError'
       summary: 删除图片
       tags:
       - images
@@ -85,18 +70,27 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/handler.ImageGroup'
-            type: array
+            $ref: '#/definitions/handler.APIResponse'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.APIError'
       summary: 图片列表
       tags:
       - images
+  /info:
+    get:
+      description: 返回服务端存储目录与配置文件路径，供前端展示
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      summary: 服务信息
+      tags:
+      - info
   /upload:
     post:
       consumes:
@@ -115,22 +109,18 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/handler.UploadResponse'
+            $ref: '#/definitions/handler.APIResponse'
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.APIError'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.APIError'
       summary: 上传图片
       tags:
       - images
