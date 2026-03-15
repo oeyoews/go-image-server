@@ -17,6 +17,7 @@ import (
 	"go-image-server/internal/handler"
 	"go-image-server/internal/storage"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/mitchellh/go-homedir"
@@ -151,6 +152,7 @@ func main() {
 	h := handler.NewUploadHandler(st)
 
 	r := gin.Default()
+	r.Use(cors.Default()) // 允许跨域请求
 	r.StaticFile("/", "static/index.html")
 	// 直接以路径访问图片，例如 /files/2026-03-14/xxx.png
 	r.StaticFS("/files", gin.Dir(uploadDir, false))
