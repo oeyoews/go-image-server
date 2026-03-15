@@ -153,7 +153,6 @@ func main() {
 
 	r := gin.Default()
 	r.Use(cors.Default()) // 允许跨域请求
-	r.StaticFile("/", "static/index.html")
 	// 直接以路径访问图片，例如 /files/2026-03-14/xxx.png
 	r.StaticFS("/files", gin.Dir(uploadDir, false))
 	r.POST("/upload", h.Upload)

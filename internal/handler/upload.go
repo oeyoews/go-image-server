@@ -44,7 +44,8 @@ type ImageGroup struct {
 // @Tags         images
 // @Accept       multipart/form-data
 // @Produce      json
-// @Param        file  formData  file  true  "图片文件"
+// @Param        file      formData  file  true   "图片文件"
+// @Param        filename  formData  string false "保存时的文件名（可选，上传前改名）"
 // @Success      200   {object}  UploadResponse
 // @Failure      400   {object}  map[string]string
 // @Failure      500   {object}  map[string]string
@@ -68,7 +69,12 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 	}
 	defer f.Close()
 
-	relPath, err := h.storage.Save(f, file.Filename)
+	// 允许通过 form 字段 filename 指定保存时的文件名（上传前改名）
+	saveName := c.PostForm("filename")
+	if saveName == "" {
+		saveName = file.Filename
+	}
+	relPath, err := h.storage.Save(f, saveName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
