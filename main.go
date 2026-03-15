@@ -20,8 +20,8 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 	"github.com/mitchellh/go-homedir"
+	log "github.com/sirupsen/logrus"
 )
 
 // Version 版本号，构建时可覆盖: go build -ldflags "-X main.Version=1.0.0"
@@ -189,13 +189,9 @@ func main() {
 		apiV1.DELETE("/images", h.DeleteImage)
 	}
 
-	port := os.Getenv("PORT")
+	port := cfg.Port
 	if port == "" {
-		if cfg.Port != "" {
-			port = cfg.Port
-		} else {
-			port = "48083"
-		}
+		port = "48083"
 	}
 
 	basePort, err := strconv.Atoi(port)
