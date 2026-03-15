@@ -187,12 +187,9 @@ func main() {
 	cfg, cfgPath := loadConfig()
 	uploadDir := resolveUploadDir(cfg)
 
-	log.WithField("path", cfgPath).Info("Config file path")
-	log.WithFields(log.Fields{
-		"port":       cfg.Port,
-		"upload_dir": cfg.UploadDir,
-	}).Info("Config loaded")
-	log.WithField("upload_dir", uploadDir).Info("Resolved upload dir")
+	log.Infof("Config file path: %s", cfgPath)
+	log.Infof("Config loaded: port=%s upload_dir=%s", cfg.Port, cfg.UploadDir)
+	log.Infof("Resolved upload dir: %s", uploadDir)
 
 	st, err := storage.NewLocalStorage(uploadDir)
 	if err != nil {
@@ -241,8 +238,8 @@ func main() {
 		}
 
 		uploadPageURL := fmt.Sprintf("http://localhost:%d/", p)
-		log.WithField("port", p).Info("Server starting")
-		log.WithField("url", uploadPageURL).Info("Web upload page")
+		log.Infof("Server starting on port %d", p)
+		log.Infof("Web upload page: %s", uploadPageURL)
 
 		if cfg.OpenBrowser {
 			go openBrowser(uploadPageURL)
