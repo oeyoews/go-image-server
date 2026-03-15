@@ -267,4 +267,3 @@ func main() {
 		break
 	}
 }
-

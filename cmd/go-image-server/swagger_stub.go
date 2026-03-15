@@ -8,4 +8,3 @@ import "github.com/gin-gonic/gin"
 func registerSwagger(r *gin.Engine, isDev bool) {
 	// no-op
 }
-
