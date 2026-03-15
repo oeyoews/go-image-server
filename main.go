@@ -188,6 +188,8 @@ func main() {
 		apiV1.GET("/images", h.ListImages)
 		apiV1.DELETE("/images", h.DeleteImage)
 	}
+	// 原版上传页：Vue3 + Tailwind CDN，同 neotw-image-upload 插件功能
+	r.GET("/", func(c *gin.Context) { c.File("static/index.html") })
 
 	port := cfg.Port
 	if port == "" {
