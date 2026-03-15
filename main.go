@@ -10,8 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -28,8 +32,9 @@ import (
 var Version = "1.0.0"
 
 type Config struct {
-	Port      string `json:"port"`
-	UploadDir string `json:"upload_dir"`
+	Port        string `json:"port"`
+	UploadDir   string `json:"upload_dir"`
+	OpenBrowser bool   `json:"open_browser"`
 }
 
 func getDefaultUploadDir() string {
@@ -41,8 +46,9 @@ func getDefaultUploadDir() string {
 
 func defaultConfig() Config {
 	return Config{
-		Port:      "48083",
-		UploadDir: getDefaultUploadDir(),
+		Port:        "48083",
+		UploadDir:   getDefaultUploadDir(),
+		OpenBrowser: true,
 	}
 }
 
@@ -149,6 +155,24 @@ func setupLogger() {
 	}
 }
 
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "windows":
+		// 使用系统默认浏览器打开
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default: // linux, *bsd 等
+		cmd = exec.Command("xdg-open", url)
+	}
+
+	if err := cmd.Start(); err != nil {
+		log.WithError(err).WithField("url", url).Warn("Failed to open browser")
+	}
+}
+
 func main() {
 	for _, arg := range os.Args[1:] {
 		if arg == "-version" || arg == "--version" || arg == "-v" {
@@ -205,15 +229,26 @@ func main() {
 	for i := 0; i < maxTries; i++ {
 		p := basePort + i
 		addr := fmt.Sprintf(":%d", p)
-		uploadPageURL := fmt.Sprintf("http://localhost:%d/", p)
-		log.WithField("port", p).Info("Server starting")
-		log.WithField("url", uploadPageURL).Info("Web upload page")
-		if err := r.Run(addr); err != nil {
+
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
 			msg := err.Error()
 			if strings.Contains(msg, "address already in use") || strings.Contains(msg, "Only one usage of each socket address") {
 				log.WithField("port", p).Warn("Port in use, trying next")
 				continue
 			}
+			log.WithError(err).Fatal("Failed to listen")
+		}
+
+		uploadPageURL := fmt.Sprintf("http://localhost:%d/", p)
+		log.WithField("port", p).Info("Server starting")
+		log.WithField("url", uploadPageURL).Info("Web upload page")
+
+		if cfg.OpenBrowser {
+			go openBrowser(uploadPageURL)
+		}
+
+		if err := http.Serve(ln, r); err != nil {
 			log.WithError(err).Fatal("Server exited")
 		}
 		break
