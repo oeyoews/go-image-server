@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go-image-server/internal/handler"
+	"go-image-server/internal/handler/upload"
 	"go-image-server/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +36,7 @@ func newTestServer(t *testing.T) (*gin.Engine, string) {
 	}
 
 	// configPath 和 version 在测试中用不到，传空即可
-	h := handler.NewUploadHandler(st, tmpDir, "", "test")
+	h := upload.NewHandler(st, tmpDir, "", "test")
 
 	r := gin.Default()
 	apiV1 := r.Group("/api/v1")
@@ -67,7 +67,7 @@ func TestInfoEndpoint(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", w.Code)
 	}
 
-	var resp apiResponse[handler.InfoResponse]
+	var resp apiResponse[upload.InfoResponse]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestUploadAndListImages(t *testing.T) {
 		t.Fatalf("expected status 200 on list, got %d, body=%s", w.Code, w.Body.String())
 	}
 
-	var listResp apiResponse[[]handler.ImageGroup]
+	var listResp apiResponse[[]upload.ImageGroup]
 	if err := json.NewDecoder(w.Body).Decode(&listResp); err != nil {
 		t.Fatalf("decode list response: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestUploadAndDeleteImage(t *testing.T) {
 		t.Fatalf("expected status 201, got %d, body=%s", w.Code, w.Body.String())
 	}
 
-	var uploadResp apiResponse[handler.UploadResponse]
+	var uploadResp apiResponse[upload.UploadResponse]
 	if err := json.NewDecoder(w.Body).Decode(&uploadResp); err != nil {
 		t.Fatalf("decode upload response: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestUploadAndDeleteImage(t *testing.T) {
 		t.Fatalf("expected status 200 on delete, got %d, body=%s", w.Code, w.Body.String())
 	}
 
-	var delResp apiResponse[handler.DeleteResult]
+	var delResp apiResponse[upload.DeleteResult]
 	if err := json.NewDecoder(w.Body).Decode(&delResp); err != nil {
 		t.Fatalf("decode delete response: %v", err)
 	}

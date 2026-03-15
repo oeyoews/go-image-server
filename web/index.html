@@ -11,8 +11,477 @@
   <div id="app"></div>
 
   <script>
-// (content same as previous static/index.html)
+    const { createApp } = Vue;
+
+    const i18n = {
+      en: {
+        uploadTitle: 'Image Upload',
+        dropHint: 'Click, drag or Ctrl+V to paste image here',
+        size: 'Size',
+        fileName: 'File name',
+        fileNamePlaceholder: 'Filename (optional extension)',
+        pasteHint: 'This area supports Ctrl+V to paste images',
+        imageList: 'Image list',
+        hideList: 'Hide list',
+        upload: 'Upload',
+        uploading: 'Uploading...',
+        link: 'Link',
+        copy: 'Copy',
+        copied: 'Copied',
+        refresh: 'Refresh',
+        loading: 'Loading...',
+        storage: 'Storage',
+        config: 'Config',
+        copyStoragePath: 'Copy storage path',
+        copyConfigPath: 'Copy config path',
+        noImages: 'No images',
+        noImagesHint: 'Drag image in the upload area above or use Ctrl+V to paste',
+        open: 'Open',
+        copyLink: 'Copy link',
+        delete: 'Delete',
+        showImageList: 'Show image list',
+        hideImageList: 'Hide image list',
+        preview: 'Preview',
+        deleteConfirm: 'Delete this image?',
+        deleteFail: 'Delete failed',
+        loadFail: 'Load failed',
+      },
+      zh: {
+        uploadTitle: '图片上传',
+        dropHint: '点击、拖拽或 Ctrl+V 粘贴图片到此处',
+        size: '大小',
+        fileName: '文件名称',
+        fileNamePlaceholder: '文件名（可含扩展名）',
+        pasteHint: '本区域支持 Ctrl+V 粘贴图片',
+        imageList: '图片列表',
+        hideList: '隐藏列表',
+        upload: '上传',
+        uploading: '上传中...',
+        link: '链接',
+        copy: '复制',
+        copied: '已复制',
+        refresh: '刷新',
+        loading: '加载中...',
+        storage: '存储',
+        config: '配置',
+        copyStoragePath: '复制存储路径',
+        copyConfigPath: '复制配置路径',
+        noImages: '暂无图片',
+        noImagesHint: '可在上方上传区拖拽图片，或使用 Ctrl+V 粘贴上传',
+        open: '打开',
+        copyLink: '复制链接',
+        delete: '删除',
+        showImageList: '显示图片列表',
+        hideImageList: '隐藏图片列表',
+        preview: '预览',
+        deleteConfirm: '确定删除这张图片吗？',
+        deleteFail: '删除失败',
+        loadFail: '加载失败',
+      },
+    };
+
+    function unwrapApiResponse(data) {
+      return { payload: data?.data, errorMessage: data?.message };
+    }
+
+    function getApiBase() {
+      const origin = window.location.origin || '';
+      return origin ? origin + '/api/v1' : '/api/v1';
+    }
+
+    createApp({
+      data() {
+        return {
+          lang: localStorage.getItem('upload-lang') || 'en',
+          file: null,
+          previewUrl: '',
+          selectedFileName: '',
+          uploadFileName: '',
+          isDragover: false,
+          uploading: false,
+          resultUrl: '',
+          resultMessage: '',
+          resultError: false,
+          resultCopied: '',
+          selectedFormat: localStorage.getItem('upload-format') || 'md',
+          apiBase: getApiBase(),
+          imageGroups: [],
+          imagesLoading: false,
+          imagesError: '',
+          dateFilter: new Date().toISOString().slice(0, 10),
+          showImageList: false,
+          storagePath: '',
+          configPath: '',
+          pathCopied: '',
+        };
+      },
+      computed: {
+        t() {
+          return i18n[this.lang] || i18n.en;
+        },
+        markdownSnippet() {
+          return this.resultUrl ? `![](${this.resultUrl})` : '';
+        },
+        wikitextSnippet() {
+          return this.resultUrl ? `[img[image|${this.resultUrl}]]` : '';
+        },
+        vanillaSnippet() {
+          return this.resultUrl || '';
+        },
+        displaySnippet() {
+          if (!this.resultUrl) return '';
+          if (this.selectedFormat === 'md') return this.markdownSnippet;
+          if (this.selectedFormat === 'tw') return this.wikitextSnippet;
+          return this.vanillaSnippet;
+        },
+      },
+      mounted() {
+        this.loadImages();
+        this.loadServerInfo();
+      },
+      beforeUnmount() {
+        if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+      },
+      methods: {
+        resetPreview() {
+          if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+          this.file = null;
+          this.previewUrl = '';
+          this.selectedFileName = '';
+          this.uploadFileName = '';
+        },
+        getUploadFilename() {
+          const raw = (this.uploadFileName || '').trim();
+          const origName = this.file?.name || '';
+          if (!origName) return origName;
+          const origExt = origName.includes('.') ? origName.slice(origName.lastIndexOf('.')) : '';
+          if (!raw) return origName;
+          const base = raw.includes('.') ? raw.slice(0, raw.lastIndexOf('.')) : raw;
+          return base ? base + origExt : origName;
+        },
+        onFileChange(e) {
+          const file = e?.target?.files?.[0];
+          if (!file) {
+            this.resetPreview();
+            return;
+          }
+          if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+          this.file = file;
+          this.selectedFileName = file.name;
+          this.uploadFileName = '';
+          this.previewUrl = URL.createObjectURL(file);
+        },
+        onDragOver(e) {
+          e.preventDefault();
+          this.isDragover = true;
+        },
+        onDragLeave() {
+          this.isDragover = false;
+        },
+        onDrop(e) {
+          e.preventDefault();
+          this.isDragover = false;
+          const file = e?.dataTransfer?.files?.[0];
+          if (!file) return;
+          if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+          this.file = file;
+          this.selectedFileName = file.name;
+          this.uploadFileName = '';
+          this.previewUrl = URL.createObjectURL(file);
+        },
+        onPaste(e) {
+          const items = e?.clipboardData?.items;
+          if (!items?.length) return;
+          let file = null;
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.kind === 'file' && item.type?.startsWith('image/')) {
+              file = item.getAsFile();
+              break;
+            }
+          }
+          if (!file) return;
+          if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+          this.file = file;
+          this.selectedFileName = file.name || 'pasted-image';
+          this.uploadFileName = '';
+          this.previewUrl = URL.createObjectURL(file);
+        },
+        async handleUpload() {
+          if (!this.file || this.uploading) return;
+          this.uploading = true;
+          this.resultMessage = '';
+          this.resultError = false;
+          this.resultUrl = '';
+
+          const fd = new FormData();
+          const saveAsName = this.getUploadFilename();
+          fd.append('file', this.file, saveAsName);
+          if (saveAsName !== this.file.name) fd.append('filename', saveAsName);
+          try {
+            const res = await fetch(`${this.apiBase}/upload`, { method: 'POST', body: fd });
+            const raw = await res.json();
+            const { payload, errorMessage } = unwrapApiResponse(raw);
+            if (res.ok) {
+              this.resultError = false;
+              this.resultUrl = (payload?.url) || '';
+              this.resultMessage = this.resultUrl ? '' : 'Upload OK but no URL returned';
+              if (this.resultUrl) this.copySnippet(this.selectedFormat);
+              await this.loadImages();
+            } else {
+              this.resultError = true;
+              this.resultMessage = errorMessage || 'Upload failed';
+            }
+          } catch (err) {
+            this.resultError = true;
+            this.resultMessage = 'Request failed: ' + err.message;
+          } finally {
+            this.uploading = false;
+          }
+        },
+        async loadServerInfo() {
+          try {
+            const res = await fetch(`${this.apiBase}/info`);
+            if (!res.ok) return;
+            const raw = await res.json();
+            const { payload } = unwrapApiResponse(raw);
+            this.storagePath = payload?.upload_dir || '';
+            this.configPath = payload?.config_file || '';
+          } catch (_) {
+            this.storagePath = '';
+            this.configPath = '';
+          }
+        },
+        async loadImages() {
+          this.imagesLoading = true;
+          this.imagesError = '';
+          const qs = this.dateFilter ? `?date=${encodeURIComponent(this.dateFilter)}` : '';
+          try {
+            const res = await fetch(`${this.apiBase}/images${qs}`);
+            if (!res.ok) {
+              this.imagesError = this.t.loadFail + ': ' + res.status;
+              this.imageGroups = [];
+              return;
+            }
+            const raw = await res.json();
+            const { payload } = unwrapApiResponse(raw);
+            this.imageGroups = Array.isArray(payload) ? payload : [];
+          } catch (e) {
+            this.imagesError = this.t.loadFail + ': ' + e.message;
+            this.imageGroups = [];
+          } finally {
+            this.imagesLoading = false;
+          }
+        },
+        formatSize(size) {
+          if (size >= 1024 * 1024 * 1024) return (size / (1024 ** 3)).toFixed(2) + ' GB';
+          if (size >= 1024 * 1024) return (size / (1024 ** 2)).toFixed(2) + ' MB';
+          if (size >= 1024) return (size / 1024).toFixed(2) + ' KB';
+          return size + ' B';
+        },
+        openImage(url) {
+          if (url) window.open(url, '_blank');
+        },
+        setLang(l) {
+          this.lang = l;
+          localStorage.setItem('upload-lang', l);
+        },
+        saveFormatPreference() {
+          localStorage.setItem('upload-format', this.selectedFormat);
+        },
+        async copyToClipboard(text) {
+          if (!text || typeof text !== 'string') return false;
+          try {
+            if (navigator.clipboard?.writeText) {
+              await navigator.clipboard.writeText(text);
+              return true;
+            }
+          } catch (_) {}
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          let ok = false;
+          try {
+            ok = document.execCommand('copy');
+          } catch (_) {}
+          document.body.removeChild(ta);
+          return ok;
+        },
+        async copySnippet(kind) {
+          if (!this.resultUrl) return;
+          let text = kind === 'md' ? this.markdownSnippet : kind === 'tw' ? this.wikitextSnippet : this.vanillaSnippet;
+          if (!text) return;
+          const ok = await this.copyToClipboard(text);
+          if (ok) {
+            this.resultCopied = kind;
+            setTimeout(() => { this.resultCopied = ''; }, 1500);
+          }
+        },
+        async copyPath(path, kind) {
+          if (!path) return;
+          const ok = await this.copyToClipboard(path);
+          if (ok) {
+            this.pathCopied = kind;
+            setTimeout(() => { this.pathCopied = ''; }, 1500);
+          }
+        },
+        async copyLink(img) {
+          const url = img?.url;
+          if (!url) return;
+          let text = this.selectedFormat === 'md' ? `![](${url})` : this.selectedFormat === 'tw' ? `[img[image|${url}]]` : url;
+          const ok = await this.copyToClipboard(text);
+          if (ok) {
+            img._copied = true;
+            setTimeout(() => { img._copied = false; }, 1500);
+          }
+        },
+        async deleteImage(img) {
+          if (!img?.path) return;
+          if (!window.confirm(this.t.deleteConfirm + '\n' + img.path)) return;
+          try {
+            const res = await fetch(`${this.apiBase}/images?path=${encodeURIComponent(img.path)}`, { method: 'DELETE' });
+            if (!res.ok) {
+              let raw = {};
+              try { raw = await res.json(); } catch (_) {}
+              const { errorMessage } = unwrapApiResponse(raw);
+              window.alert(this.t.deleteFail + ': ' + (errorMessage || res.status));
+              return;
+            }
+            await this.loadImages();
+          } catch (e) {
+            window.alert(this.t.deleteFail + ': ' + e.message);
+          }
+        },
+      },
+      template: `
+        <div class="mx-auto max-w-4xl px-3 py-4 sm:px-0 sm:py-6 text-sm space-y-6 sm:space-y-8">
+          <section class="rounded-lg border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-gray-100">
+              <h1 class="text-base font-semibold text-gray-900">{{ t.uploadTitle }}</h1>
+              <div class="flex gap-1 text-xs">
+                <button type="button" class="rounded px-2 py-1 transition-colors" :class="lang === 'en' ? 'bg-gray-200 font-medium' : 'text-gray-500 hover:text-gray-700'" @click="setLang('en')">EN</button>
+                <button type="button" class="rounded px-2 py-1 transition-colors" :class="lang === 'zh' ? 'bg-gray-200 font-medium' : 'text-gray-500 hover:text-gray-700'" @click="setLang('zh')">中文</button>
+              </div>
+            </div>
+
+            <form @submit.prevent="handleUpload" @paste.stop.prevent="onPaste" class="space-y-4">
+              <label
+                class="flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-3 py-6 text-center transition-all sm:min-h-[200px] hover:border-gray-400 hover:bg-gray-50/80 focus-within:ring-2 focus-within:ring-gray-400/50"
+                :class="{ 'border-gray-500 bg-gray-100/80': isDragover }"
+                @dragover.prevent="onDragOver"
+                @dragleave.prevent="onDragLeave"
+                @drop.prevent="onDrop"
+                tabindex="0"
+              >
+                <input ref="fileInput" type="file" class="hidden" accept="image/jpeg,image/png,image/gif,image/webp" @change="onFileChange" />
+                <span v-if="!selectedFileName" class="text-gray-500 text-sm">{{ t.dropHint }}</span>
+                <div v-else class="mt-2 flex w-full max-w-full flex-col items-center gap-2">
+                  <div class="flex flex-wrap items-center justify-center gap-x-2 text-xs">
+                    <span class="truncate max-w-[200px] text-gray-600" :title="selectedFileName">{{ selectedFileName }}</span>
+                    <span v-if="file?.size" class="text-gray-500">{{ t.size }}: {{ formatSize(file.size) }}</span>
+                  </div>
+                  <img v-if="previewUrl" :src="previewUrl" :alt="t.preview" class="max-h-20 w-auto max-w-full rounded border border-gray-200 object-contain sm:max-h-24" />
+                  <div class="mt-2 flex w-full min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
+                    <label class="shrink-0 text-xs text-gray-500">{{ t.fileName }}</label>
+                    <input v-model="uploadFileName" type="text" class="min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400" :placeholder="selectedFileName || t.fileNamePlaceholder" />
+                  </div>
+                </div>
+              </label>
+
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="min-w-0 flex-1 text-xs text-gray-400">{{ t.pasteHint }}</p>
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                  <button type="button" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors" @click="showImageList = !showImageList">
+                    {{ showImageList ? t.hideList : t.imageList }}
+                  </button>
+                  <button type="submit" class="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" :disabled="!file || uploading">
+                    {{ uploading ? t.uploading : t.upload }}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </section>
+
+          <template v-if="!resultError && resultUrl">
+            <div class="rounded-lg border border-gray-200 bg-white overflow-hidden">
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+                <img :src="resultUrl" :alt="t.preview" class="size-8 shrink-0 rounded border border-gray-200 object-cover" />
+                <div class="flex items-center gap-2">
+                  <select v-model="selectedFormat" @change="saveFormatPreference" class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium focus:ring-1 focus:ring-gray-400">
+                    <option value="md">Markdown</option>
+                    <option value="tw">Wikitext</option>
+                    <option value="link">{{ t.link }}</option>
+                  </select>
+                  <button type="button" class="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors" @click="copySnippet(selectedFormat)">
+                    {{ resultCopied ? t.copied : t.copy }}
+                  </button>
+                </div>
+              </div>
+              <div class="p-3 overflow-x-auto">
+                <pre class="m-0 rounded bg-gray-100 px-3 py-2 text-xs font-mono leading-relaxed whitespace-pre break-all select-text"><code>{{ displaySnippet }}</code></pre>
+              </div>
+            </div>
+          </template>
+          <div v-else-if="resultError || resultMessage" class="rounded-lg border px-4 py-3 text-sm" :class="resultError ? 'border-red-200 bg-red-50 text-red-800' : 'border-gray-200 bg-gray-50'">
+            {{ resultMessage }}
+          </div>
+
+          <section v-show="showImageList" class="rounded-lg border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
+            <h2 class="mb-3 border-b border-gray-100 pb-2 text-base font-semibold text-gray-900">{{ t.imageList }}</h2>
+            <div class="mb-3 flex flex-wrap items-center justify-end gap-2">
+              <input v-model="dateFilter" type="date" class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-gray-400" @change="loadImages" />
+              <button type="button" class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs hover:bg-gray-50" @click="loadImages">{{ t.refresh }}</button>
+              <span v-if="imagesLoading" class="text-xs text-gray-500">{{ t.loading }}</span>
+            </div>
+            <div v-if="storagePath || configPath" class="mb-3 flex flex-col gap-1.5 text-[11px]">
+              <div v-if="storagePath" class="flex items-center gap-2 rounded bg-gray-100/60 px-2.5 py-1.5">
+                <span class="w-10 shrink-0 text-gray-500">{{ t.storage }}</span>
+                <span :title="storagePath" class="min-w-0 flex-1 truncate font-mono text-gray-700">{{ storagePath }}</span>
+                <button type="button" class="shrink-0 rounded px-2 py-0.5 text-gray-500 hover:bg-gray-200" @click="copyPath(storagePath, 'storage')">{{ pathCopied === 'storage' ? t.copied : t.copy }}</button>
+              </div>
+              <div v-if="configPath" class="flex items-center gap-2 rounded bg-gray-100/60 px-2.5 py-1.5">
+                <span class="w-10 shrink-0 text-gray-500">{{ t.config }}</span>
+                <span :title="configPath" class="min-w-0 flex-1 truncate font-mono text-gray-700">{{ configPath }}</span>
+                <button type="button" class="shrink-0 rounded px-2 py-0.5 text-gray-500 hover:bg-gray-200" @click="copyPath(configPath, 'config')">{{ pathCopied === 'config' ? t.copied : t.copy }}</button>
+              </div>
+            </div>
+            <div class="max-h-[360px] sm:max-h-[480px] overflow-auto rounded-lg border border-gray-200 bg-gray-50/50">
+              <div v-if="imagesError" class="p-4 text-sm text-red-600">{{ imagesError }}</div>
+              <div v-else-if="!imageGroups.length" class="flex flex-col items-center justify-center gap-2 py-12 px-4 text-center border-2 border-dashed border-gray-200 rounded-lg">
+                <p class="text-sm font-medium text-gray-600">{{ t.noImages }}</p>
+                <p class="text-xs text-gray-500">{{ t.noImagesHint }}</p>
+              </div>
+              <template v-else>
+                <div v-for="group in imageGroups" :key="group.date" class="p-2">
+                  <div class="mb-2 mt-1 px-1 text-xs font-medium uppercase tracking-wide text-gray-500">{{ group.date }}</div>
+                  <div v-for="(img, index) in group.files" :key="img.path" class="group flex flex-wrap items-center gap-2 rounded-md px-2 py-2 hover:bg-white border border-transparent hover:border-gray-200 transition-colors">
+                    <div class="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-100 text-xs text-gray-400 sm:h-11 sm:w-11">
+                      <img v-if="img.url" :src="img.url" alt="" class="relative z-[1] h-full w-full object-cover" @error="$event.target.style.display='none'" />
+                      <span class="absolute inset-0 z-0 flex items-center justify-center">{{ index + 1 }}</span>
+                    </div>
+                    <div class="min-w-0 flex-1 basis-0">
+                      <div class="truncate text-xs text-gray-800 sm:text-[13px]" :title="img.path">
+                        <span class="mr-1 text-gray-400">#{{ index + 1 }}</span>
+                        <span class="truncate">{{ img.path }}</span>
+                      </div>
+                      <div class="mt-0.5 text-[10px] text-gray-500 sm:text-[11px]">{{ t.size }}: {{ formatSize(img.size) }}</div>
+                    </div>
+                    <div class="flex shrink-0 flex-wrap gap-1">
+                      <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-[10px] sm:text-[11px] hover:bg-gray-50" @click="openImage(img.url)">{{ t.open }}</button>
+                      <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-[10px] sm:text-[11px] hover:bg-gray-50" @click="copyLink(img)">{{ img._copied ? t.copied : t.copyLink }}</button>
+                      <button type="button" class="rounded border border-red-200 px-2 py-1 text-[10px] sm:text-[11px] text-red-600 hover:bg-red-50" @click="deleteImage(img)">{{ t.delete }}</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
+      `,
+    }).mount('#app');
   </script>
 </body>
 </html>
-

@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  handler.APIError:
+  upload.APIError:
     properties:
       code:
         example: 400
@@ -10,7 +10,7 @@ definitions:
         example: missing path
         type: string
     type: object
-  handler.APIResponse:
+  upload.APIResponse:
     properties:
       code:
         example: 200
@@ -41,19 +41,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.APIResponse'
+            $ref: '#/definitions/upload.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.APIError'
+            $ref: '#/definitions/upload.APIError'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handler.APIError'
+            $ref: '#/definitions/upload.APIError'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.APIError'
+            $ref: '#/definitions/upload.APIError'
       summary: 删除图片
       tags:
       - images
@@ -70,11 +70,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.APIResponse'
+            $ref: '#/definitions/upload.APIResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.APIError'
+            $ref: '#/definitions/upload.APIError'
       summary: 图片列表
       tags:
       - images
@@ -87,7 +87,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.APIResponse'
+            $ref: '#/definitions/upload.APIResponse'
       summary: 服务信息
       tags:
       - info
@@ -112,15 +112,15 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handler.APIResponse'
+            $ref: '#/definitions/upload.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.APIError'
+            $ref: '#/definitions/upload.APIError'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.APIError'
+            $ref: '#/definitions/upload.APIError'
       summary: 上传图片
       tags:
       - images

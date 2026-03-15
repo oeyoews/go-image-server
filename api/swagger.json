@@ -30,13 +30,13 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
+                            "$ref": "#/definitions/upload.APIResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIError"
+                            "$ref": "#/definitions/upload.APIError"
                         }
                     }
                 }
@@ -63,25 +63,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
+                            "$ref": "#/definitions/upload.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIError"
+                            "$ref": "#/definitions/upload.APIError"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIError"
+                            "$ref": "#/definitions/upload.APIError"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIError"
+                            "$ref": "#/definitions/upload.APIError"
                         }
                     }
                 }
@@ -101,7 +101,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
+                            "$ref": "#/definitions/upload.APIResponse"
                         }
                     }
                 }
@@ -139,19 +139,19 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
+                            "$ref": "#/definitions/upload.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIError"
+                            "$ref": "#/definitions/upload.APIError"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handler.APIError"
+                            "$ref": "#/definitions/upload.APIError"
                         }
                     }
                 }
@@ -159,7 +159,7 @@
         }
     },
     "definitions": {
-        "handler.APIError": {
+        "upload.APIError": {
             "type": "object",
             "properties": {
                 "code": {
@@ -173,7 +173,7 @@
                 }
             }
         },
-        "handler.APIResponse": {
+        "upload.APIResponse": {
             "type": "object",
             "properties": {
                 "code": {
