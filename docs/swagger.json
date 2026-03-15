@@ -125,6 +125,12 @@
                         "name": "file",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "保存时的文件名（可选，上传前改名）",
+                        "name": "filename",
+                        "in": "formData"
                     }
                 ],
                 "responses": {

@@ -108,6 +108,10 @@ paths:
         name: file
         required: true
         type: file
+      - description: 保存时的文件名（可选，上传前改名）
+        in: formData
+        name: filename
+        type: string
       produces:
       - application/json
       responses:
