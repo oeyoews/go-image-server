@@ -3,7 +3,7 @@ package main
 // @title           Go Image Server API
 // @version         1.0
 // @description     Local image upload and management service.
-// @BasePath        /
+// @BasePath        /api/v1
 
 import (
 	"encoding/json"
@@ -23,6 +23,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/mitchellh/go-homedir"
 )
+
+// Version 版本号，构建时可覆盖: go build -ldflags "-X main.Version=1.0.0"
+var Version = "1.0.0"
 
 type Config struct {
 	Port      string `json:"port"`
@@ -147,6 +150,13 @@ func setupLogger() {
 }
 
 func main() {
+	for _, arg := range os.Args[1:] {
+		if arg == "-version" || arg == "--version" || arg == "-v" {
+			fmt.Println(Version)
+			os.Exit(0)
+		}
+	}
+
 	setupLogger()
 	gin.SetMode(gin.ReleaseMode) // 关闭 [GIN-debug] 路由注册日志
 
@@ -165,16 +175,19 @@ func main() {
 		log.WithError(err).Fatal("Failed to init storage")
 	}
 
-	h := handler.NewUploadHandler(st, uploadDir, cfgPath)
+	h := handler.NewUploadHandler(st, uploadDir, cfgPath, Version)
 
 	r := gin.Default()
 	r.Use(cors.Default()) // 允许跨域请求
 	// 直接以路径访问图片，例如 /files/2026-03-14/xxx.png
 	r.StaticFS("/files", gin.Dir(uploadDir, false))
-	r.GET("/info", h.Info)
-	r.POST("/upload", h.Upload)
-	r.GET("/images", h.ListImages)
-	r.DELETE("/images", h.DeleteImage)
+	apiV1 := r.Group("/api/v1")
+	{
+		apiV1.GET("/info", h.Info)
+		apiV1.POST("/upload", h.Upload)
+		apiV1.GET("/images", h.ListImages)
+		apiV1.DELETE("/images", h.DeleteImage)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {

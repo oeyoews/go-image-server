@@ -17,14 +17,16 @@ type UploadHandler struct {
 	storage    *storage.LocalStorage
 	uploadDir  string
 	configPath string
+	version    string
 }
 
-func NewUploadHandler(s *storage.LocalStorage, uploadDir, configPath string) *UploadHandler {
-	return &UploadHandler{storage: s, uploadDir: uploadDir, configPath: configPath}
+func NewUploadHandler(s *storage.LocalStorage, uploadDir, configPath, version string) *UploadHandler {
+	return &UploadHandler{storage: s, uploadDir: uploadDir, configPath: configPath, version: version}
 }
 
 // InfoResponse 服务信息响应
 type InfoResponse struct {
+	Version    string `json:"version"`
 	UploadDir  string `json:"upload_dir"`
 	ConfigFile string `json:"config_file"`
 }
@@ -42,6 +44,7 @@ func (h *UploadHandler) Info(c *gin.Context) {
 		uploadDir = abs
 	}
 	respOK(c, InfoResponse{
+		Version:    h.version,
 		UploadDir:  uploadDir,
 		ConfigFile: h.configPath,
 	})
