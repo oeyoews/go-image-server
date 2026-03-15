@@ -33,3 +33,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "==> Build succeeded. Output: $(Join-Path $OutputDir "$BinaryName.exe")" -ForegroundColor Green
+
+# 显示构建后二进制大小，便于和不同参数对比
+$binPath = Join-Path $OutputDir "$BinaryName.exe"
+if (Test-Path $binPath) {
+    $sizeBytes = (Get-Item $binPath).Length
+    $sizeMB = $sizeBytes / 1MB
+    Write-Host ("==> Binary size: {0:N2} MB ({1} bytes)" -f $sizeMB, $sizeBytes) -ForegroundColor Green
+}
