@@ -182,7 +182,19 @@ func main() {
 	}
 
 	setupLogger()
-	gin.SetMode(gin.ReleaseMode) // 关闭 [GIN-debug] 路由注册日志
+
+	mode := strings.ToLower(os.Getenv("GIN_MODE"))
+	if mode == "" {
+		mode = strings.ToLower(os.Getenv("APP_ENV"))
+	}
+
+	isDev := mode == "debug" || mode == "development" || mode == "dev"
+
+	if isDev {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode) // 关闭 [GIN-debug] 路由注册日志
+	}
 
 	cfg, cfgPath := loadConfig()
 	uploadDir := resolveUploadDir(cfg)
@@ -209,6 +221,10 @@ func main() {
 		apiV1.GET("/images", h.ListImages)
 		apiV1.DELETE("/images", h.DeleteImage)
 	}
+
+	// 开发模式下启用 Swagger UI: /swagger/index.html（仅 dev 构建有效）
+	registerSwagger(r, isDev)
+
 	// 原版上传页：Vue3 + Tailwind CDN，同 neotw-image-upload 插件功能
 	r.GET("/", func(c *gin.Context) { c.File("static/index.html") })
 
