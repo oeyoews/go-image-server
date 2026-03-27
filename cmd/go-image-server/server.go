@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"go-image-server/internal/handler/files"
 	"go-image-server/internal/handler/upload"
 	"go-image-server/internal/storage"
 	"go-image-server/internal/utils"
@@ -69,27 +70,60 @@ func run() {
 	}
 
 	cfg, cfgPath := loadConfig()
+	storageCfg := resolveStorageConfig(cfg)
 	uploadDir := resolveUploadDir(cfg)
+	if storageCfg.Type == "local" {
+		uploadDir = storageCfg.Local.BaseDir
+	}
 
 	log.Infof("Config file path: %s", cfgPath)
 	log.Infof("Config loaded: port=%s upload_dir=%s", cfg.Port, uploadDir)
 
-	st, err := storage.NewLocalStorage(uploadDir)
+	st, err := storage.New(storageCfg)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to init storage")
 	}
 
-	h := upload.NewHandler(st, uploadDir, cfgPath, Version)
+	sm := storage.NewManager(st, storageCfg)
+	h := upload.NewHandler(sm, cfgPath, Version)
+	fh := files.NewHandler(sm)
 
 	r := gin.Default()
 	r.Use(cors.Default())
-	r.StaticFS("/files", gin.Dir(uploadDir, false))
+	r.GET("/files/*path", fh.Get)
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.GET("/info", h.Info)
 		apiV1.POST("/upload", h.Upload)
 		apiV1.GET("/images", h.ListImages)
 		apiV1.DELETE("/images", h.DeleteImage)
+		apiV1.GET("/settings/storage", func(c *gin.Context) {
+			c.JSON(http.StatusOK, upload.APIResponse{
+				Code:    http.StatusOK,
+				Message: "success",
+				Data:    sm.GetConfig(),
+			})
+		})
+		apiV1.PUT("/settings/storage", func(c *gin.Context) {
+			var sc storage.DriverConfig
+			if err := c.ShouldBindJSON(&sc); err != nil {
+				c.JSON(http.StatusBadRequest, upload.APIResponse{Code: http.StatusBadRequest, Message: err.Error(), Data: nil})
+				return
+			}
+
+			resolved := resolveStorageConfig(Config{Storage: sc, UploadDir: cfg.UploadDir})
+			cfg.Storage = sc
+
+			if err := sm.Set(resolved); err != nil {
+				c.JSON(http.StatusBadRequest, upload.APIResponse{Code: http.StatusBadRequest, Message: err.Error(), Data: nil})
+				return
+			}
+			if err := writeConfig(cfgPath, cfg); err != nil {
+				c.JSON(http.StatusInternalServerError, upload.APIResponse{Code: http.StatusInternalServerError, Message: err.Error(), Data: nil})
+				return
+			}
+			c.JSON(http.StatusOK, upload.APIResponse{Code: http.StatusOK, Message: "success", Data: sc})
+		})
 	}
 
 	registerSwagger(r, isDev)

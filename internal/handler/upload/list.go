@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"sort"
 
 	"github.com/gin-gonic/gin"
@@ -16,10 +17,11 @@ import (
 // @Failure      500  {object}  APIError
 // @Router       /images [get]
 func (h *Handler) ListImages(c *gin.Context) {
+	st := h.storage.Get()
 	date := c.Query("date")
 
 	// storage 层已经按日期分组，这里只做轻量的转换与拼装 URL
-	groups, err := h.storage.ListByDate(date)
+	groups, err := st.ListByDate(context.Background(), date)
 	if err != nil {
 		respServerError(c, err.Error())
 		return
@@ -33,10 +35,11 @@ func (h *Handler) ListImages(c *gin.Context) {
 			// 始终使用 http 协议构造访问地址，便于与上传返回保持一致
 			url := "http://" + host + "/files/" + f.Path
 			group.Files = append(group.Files, ImageFile{
-				Name: f.Name,
-				Path: f.Path,
-				URL:  url,
-				Size: f.Size,
+				Name:      f.Name,
+				Path:      f.Path,
+				URL:       url,
+				DirectURL: f.DirectURL,
+				Size:      f.Size,
 			})
 		}
 		result = append(result, group)

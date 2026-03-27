@@ -14,9 +14,13 @@ import (
 // @Success      200  {object}  APIResponse
 // @Router       /info [get]
 func (h *Handler) Info(c *gin.Context) {
-	uploadDir := h.uploadDir
-	if abs, err := filepath.Abs(uploadDir); err == nil {
-		uploadDir = abs
+	cfg := h.storage.GetConfig()
+	uploadDir := ""
+	if cfg.Type == "" || cfg.Type == "local" {
+		uploadDir = cfg.Local.BaseDir
+		if abs, err := filepath.Abs(uploadDir); err == nil {
+			uploadDir = abs
+		}
 	}
 	respOK(c, InfoResponse{
 		Version:    h.version,

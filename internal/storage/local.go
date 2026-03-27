@@ -1,32 +1,23 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
-	"time"
 )
-
-const (
-	MaxFileSize = 5 << 20 // 5MB
-)
-
-var allowedExts = map[string]string{
-	".jpg":  "image/jpeg",
-	".jpeg": "image/jpeg",
-	".png":  "image/png",
-	".gif":  "image/gif",
-	".webp": "image/webp",
-	".bmp":  "image/bmp",
-	".svg":  "image/svg+xml",
-}
 
 type LocalStorage struct {
 	baseDir string
+}
+
+func init() {
+	Register("local", func(cfg DriverConfig) (Storage, error) {
+		return NewLocalStorage(cfg.Local.BaseDir)
+	})
 }
 
 func NewLocalStorage(baseDir string) (*LocalStorage, error) {
@@ -39,36 +30,18 @@ func NewLocalStorage(baseDir string) (*LocalStorage, error) {
 	return &LocalStorage{baseDir: baseDir}, nil
 }
 
-var unsafeFilenameChars = regexp.MustCompile(`[\/\\:*?"<>|]`)
-
-func sanitizeFilename(name string) string {
-	base := filepath.Base(name)
-	return unsafeFilenameChars.ReplaceAllString(base, "_")
-}
-
-func (s *LocalStorage) Save(r io.Reader, originalFilename string) (string, error) {
-	ext := strings.ToLower(filepath.Ext(originalFilename))
-	if _, ok := allowedExts[ext]; !ok {
-		return "", fmt.Errorf("unsupported extension: %s", ext)
+func (s *LocalStorage) Save(_ context.Context, r io.Reader, originalFilename string) (StoredObject, error) {
+	filename, ext, err := ensureAllowedFilename(originalFilename)
+	if err != nil {
+		return StoredObject{}, err
 	}
 
-	dateDir := time.Now().Format("2006-01-02")
+	dateDir := todayDir()
 	dir := filepath.Join(s.baseDir, dateDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", fmt.Errorf("create date dir: %w", err)
+		return StoredObject{}, fmt.Errorf("create date dir: %w", err)
 	}
 
-	sanitized := sanitizeFilename(originalFilename)
-	if sanitized == "" || sanitized == "." || sanitized == ".." {
-		sanitized = time.Now().Format("150405") + ext
-	}
-
-	filename := sanitized
-	if !strings.HasSuffix(strings.ToLower(filename), ext) {
-		filename += ext
-	}
-
-	// 防止同名覆盖，简单追加序号
 	target := filepath.Join(dir, filename)
 	for i := 1; ; i++ {
 		if _, err := os.Stat(target); os.IsNotExist(err) {
@@ -79,32 +52,40 @@ func (s *LocalStorage) Save(r io.Reader, originalFilename string) (string, error
 	}
 
 	if err := s.securePath(target, dir); err != nil {
-		return "", err
+		return StoredObject{}, err
 	}
 
 	f, err := os.Create(target)
 	if err != nil {
-		return "", fmt.Errorf("create file: %w", err)
+		return StoredObject{}, fmt.Errorf("create file: %w", err)
 	}
 	defer f.Close()
 
-	limited := io.LimitReader(r, MaxFileSize)
-	if _, err := io.Copy(f, limited); err != nil {
+	written, err := io.Copy(f, io.LimitReader(r, MaxFileSize+1))
+	if err != nil {
 		os.Remove(target)
-		return "", fmt.Errorf("write file: %w", err)
+		return StoredObject{}, fmt.Errorf("write file: %w", err)
+	}
+	if written > MaxFileSize {
+		os.Remove(target)
+		return StoredObject{}, fmt.Errorf("file too large")
 	}
 
 	rel := filepath.Join(dateDir, filepath.Base(target))
-	return rel, nil
+	return StoredObject{
+		Key:       rel,
+		DirectURL: "",
+		Size:      written,
+	}, nil
 }
 
 // Delete 删除相对路径为 relPath 的图片文件。
 // relPath 形如 "2026-03-14/xxx.png"。
-func (s *LocalStorage) Delete(relPath string) error {
-	if strings.Contains(relPath, "..") {
+func (s *LocalStorage) Delete(_ context.Context, key string) error {
+	if strings.Contains(key, "..") {
 		return fmt.Errorf("invalid path")
 	}
-	full := filepath.Join(s.baseDir, relPath)
+	full := filepath.Join(s.baseDir, key)
 
 	dayDir := filepath.Dir(full)
 	if err := s.securePath(full, s.baseDir); err != nil {
@@ -120,15 +101,9 @@ func (s *LocalStorage) Delete(relPath string) error {
 	return nil
 }
 
-type FileInfo struct {
-	Name string
-	Path string
-	Size int64
-}
-
 // ListByDate 返回按日期分组的文件列表。
 // 如果 date 非空，则只返回该日期（YYYY-MM-DD）的文件。
-func (s *LocalStorage) ListByDate(date string) (map[string][]FileInfo, error) {
+func (s *LocalStorage) ListByDate(_ context.Context, date string) (map[string][]FileInfo, error) {
 	result := make(map[string][]FileInfo)
 
 	entries, err := os.ReadDir(s.baseDir)
@@ -176,6 +151,39 @@ func (s *LocalStorage) ListByDate(date string) (map[string][]FileInfo, error) {
 	}
 
 	return result, nil
+}
+
+func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadCloser, string, int64, error) {
+	if strings.Contains(key, "..") {
+		return nil, "", 0, fmt.Errorf("invalid path")
+	}
+	full := filepath.Join(s.baseDir, key)
+	if err := s.securePath(full, s.baseDir); err != nil {
+		return nil, "", 0, err
+	}
+
+	f, err := os.Open(full)
+	if err != nil {
+		return nil, "", 0, err
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, "", 0, err
+	}
+
+	ext := strings.ToLower(filepath.Ext(key))
+	contentType, ok := allowedExts[ext]
+	if !ok {
+		contentType = "application/octet-stream"
+	}
+
+	return f, contentType, info.Size(), nil
+}
+
+func (s *LocalStorage) ResolveDirectURL(_ string) string {
+	return ""
 }
 
 func (s *LocalStorage) securePath(path, base string) error {

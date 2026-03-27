@@ -7,15 +7,14 @@ import (
 // Handler 聚合存储实现及与上传相关的上下文信息。
 // 每个字段都与对外 API 有关，例如上传目录与配置文件路径用于 Info 接口展示。
 type Handler struct {
-	storage    *storage.LocalStorage
-	uploadDir  string
+	storage    *storage.Manager
 	configPath string
 	version    string
 }
 
 // NewHandler 构造一个上传处理器实例，供 HTTP 路由注册时使用。
-func NewHandler(s *storage.LocalStorage, uploadDir, configPath, version string) *Handler {
-	return &Handler{storage: s, uploadDir: uploadDir, configPath: configPath, version: version}
+func NewHandler(m *storage.Manager, configPath, version string) *Handler {
+	return &Handler{storage: m, configPath: configPath, version: version}
 }
 
 // InfoResponse 服务信息响应
@@ -26,15 +25,17 @@ type InfoResponse struct {
 }
 
 type UploadResponse struct {
-	URL  string `json:"url"`
-	Path string `json:"path"`
+	URL       string `json:"url"`
+	DirectURL string `json:"direct_url,omitempty"`
+	Path      string `json:"path"`
 }
 
 type ImageFile struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-	URL  string `json:"url"`
-	Size int64  `json:"size"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	URL       string `json:"url"`
+	DirectURL string `json:"direct_url,omitempty"`
+	Size      int64  `json:"size"`
 }
 
 type ImageGroup struct {

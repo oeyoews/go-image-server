@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"go-image-server/internal/storage"
+
 	"github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
 )
@@ -17,9 +19,10 @@ import (
 // Config 描述服务运行所需的基础配置。
 // 这些字段既可以通过配置文件设置，也可以部分被环境变量覆盖。
 type Config struct {
-	Port        string `json:"port"`
-	UploadDir   string `json:"upload_dir"`
-	OpenBrowser bool   `json:"open_browser"`
+	Port        string               `json:"port"`
+	UploadDir   string               `json:"upload_dir"`
+	OpenBrowser bool                 `json:"open_browser"`
+	Storage     storage.DriverConfig `json:"storage"`
 }
 
 // getDefaultUploadDir 返回平台相关的默认上传目录。
@@ -37,6 +40,12 @@ func defaultConfig() Config {
 		Port:        "48083",
 		UploadDir:   getDefaultUploadDir(),
 		OpenBrowser: true,
+		Storage: storage.DriverConfig{
+			Type: "local",
+			Local: storage.LocalConfig{
+				BaseDir: getDefaultUploadDir(),
+			},
+		},
 	}
 }
 
@@ -115,6 +124,46 @@ func resolveUploadDir(cfg Config) string {
 	}
 
 	return "./uploads"
+}
+
+func resolveStorageConfig(cfg Config) storage.DriverConfig {
+	sc := cfg.Storage
+	if sc.Type == "" {
+		sc.Type = "local"
+	}
+
+	if dir := os.Getenv("UPLOAD_DIR"); dir != "" {
+		sc.Local.BaseDir = expandHome(dir)
+	} else if sc.Local.BaseDir == "" {
+		if cfg.UploadDir != "" {
+			sc.Local.BaseDir = expandHome(cfg.UploadDir)
+		} else {
+			sc.Local.BaseDir = getDefaultUploadDir()
+		}
+	}
+
+	if sc.GitHub.Token == "" && sc.GitHub.TokenEnv != "" {
+		sc.GitHub.Token = os.Getenv(sc.GitHub.TokenEnv)
+	}
+	if sc.GitLab.Token == "" && sc.GitLab.TokenEnv != "" {
+		sc.GitLab.Token = os.Getenv(sc.GitLab.TokenEnv)
+	}
+	return sc
+}
+
+func writeConfig(path string, cfg Config) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	return enc.Encode(cfg)
 }
 
 // expandHome 支持将以 ~ 开头的路径展开为当前用户的 home 目录。

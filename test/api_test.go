@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go-image-server/internal/handler/files"
 	"go-image-server/internal/handler/upload"
 	"go-image-server/internal/storage"
 
@@ -34,11 +36,14 @@ func newTestServer(t *testing.T) (*gin.Engine, string) {
 	if err != nil {
 		t.Fatalf("failed to init storage: %v", err)
 	}
+	sm := storage.NewManager(st, storage.DriverConfig{Type: "local", Local: storage.LocalConfig{BaseDir: tmpDir}})
 
 	// configPath 和 version 在测试中用不到，传空即可
-	h := upload.NewHandler(st, tmpDir, "", "test")
+	h := upload.NewHandler(sm, "", "test")
+	fh := files.NewHandler(sm)
 
 	r := gin.Default()
+	r.GET("/files/*path", fh.Get)
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.GET("/info", h.Info)
@@ -111,6 +116,24 @@ func TestUploadAndListImages(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d, body=%s", w.Code, w.Body.String())
 	}
+	var uploadResp apiResponse[upload.UploadResponse]
+	if err := json.NewDecoder(w.Body).Decode(&uploadResp); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+	if uploadResp.Data.DirectURL != "" {
+		t.Fatalf("expected empty direct_url for local storage, got %q", uploadResp.Data.DirectURL)
+	}
+	// 通过代理地址读取文件
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/files/"+uploadResp.Data.Path, nil)
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200 on proxy file get, got %d", w.Code)
+	}
+	got, _ := io.ReadAll(w.Body)
+	if string(got) != "PNGDATA" {
+		t.Fatalf("unexpected file content: %q", string(got))
+	}
 
 	// 列出图片（不过滤日期，直接全部）
 	w = httptest.NewRecorder()
@@ -129,6 +152,12 @@ func TestUploadAndListImages(t *testing.T) {
 
 	if len(listResp.Data) == 0 {
 		t.Fatalf("expected at least one image group, got 0")
+	}
+	if len(listResp.Data[0].Files) == 0 {
+		t.Fatalf("expected at least one file")
+	}
+	if listResp.Data[0].Files[0].URL == "" {
+		t.Fatalf("expected proxy url in list")
 	}
 }
 

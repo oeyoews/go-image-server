@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"go-image-server/internal/storage"
 	"go-image-server/internal/utils"
 
@@ -21,6 +22,7 @@ import (
 // @Failure      500  {object}  APIError
 // @Router       /upload [post]
 func (h *Handler) Upload(c *gin.Context) {
+	st := h.storage.Get()
 	file, err := c.FormFile("file")
 	if err != nil {
 		respBadRequest(c, "missing file")
@@ -45,25 +47,27 @@ func (h *Handler) Upload(c *gin.Context) {
 	if saveName == "" {
 		saveName = file.Filename
 	}
-	relPath, err := h.storage.Save(f, saveName)
+	obj, err := st.Save(context.Background(), f, saveName)
 	if err != nil {
 		respServerError(c, err.Error())
 		return
 	}
 
 	// 始终返回 http 协议的访问地址，保持与前端协议约定一致
-	url := "http://" + c.Request.Host + "/files/" + relPath
+	url := "http://" + c.Request.Host + "/files/" + obj.Key
 	humanSize := utils.FormatSize(file.Size)
 	log.WithFields(log.Fields{
-		"path":       relPath,
+		"path":       obj.Key,
 		"url":        url,
+		"direct_url": obj.DirectURL,
 		"size_bytes": file.Size,
 		"size":       humanSize,
 	}).Info("Image uploaded")
 
 	respCreated(c, UploadResponse{
-		URL:  url,
-		Path: relPath,
+		URL:       url,
+		DirectURL: obj.DirectURL,
+		Path:      obj.Key,
 	})
 }
 

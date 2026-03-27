@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"errors"
 	"os"
 
@@ -20,13 +21,14 @@ import (
 // @Failure      500  {object}  APIError
 // @Router       /images [delete]
 func (h *Handler) DeleteImage(c *gin.Context) {
+	st := h.storage.Get()
 	path := c.Query("path")
 	if path == "" {
 		respBadRequest(c, "missing path")
 		return
 	}
 
-	err := h.storage.Delete(path)
+	err := st.Delete(context.Background(), path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			respNotFound(c, "not found")
