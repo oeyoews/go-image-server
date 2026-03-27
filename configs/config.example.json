@@ -1,6 +1,7 @@
 {
   "port": "48083",
   "upload_dir": "",
-  "open_browser": true
+  "open_browser": true,
+  "preview_image_list": false
 }
 

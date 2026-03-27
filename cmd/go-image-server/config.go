@@ -19,10 +19,11 @@ import (
 // Config 描述服务运行所需的基础配置。
 // 这些字段既可以通过配置文件设置，也可以部分被环境变量覆盖。
 type Config struct {
-	Port        string               `json:"port"`
-	UploadDir   string               `json:"upload_dir"`
-	OpenBrowser bool                 `json:"open_browser"`
-	Storage     storage.DriverConfig `json:"storage"`
+	Port             string               `json:"port"`
+	UploadDir        string               `json:"upload_dir"`
+	OpenBrowser      bool                 `json:"open_browser"`
+	PreviewImageList bool                 `json:"preview_image_list"`
+	Storage          storage.DriverConfig `json:"storage"`
 }
 
 // getDefaultUploadDir 返回平台相关的默认上传目录。
@@ -37,9 +38,10 @@ func getDefaultUploadDir() string {
 // defaultConfig 返回一份带有合理默认值的配置，用于首次运行或配置读取失败时兜底。
 func defaultConfig() Config {
 	return Config{
-		Port:        "48083",
-		UploadDir:   getDefaultUploadDir(),
-		OpenBrowser: true,
+		Port:             "48083",
+		UploadDir:        getDefaultUploadDir(),
+		OpenBrowser:      true,
+		PreviewImageList: false,
 		Storage: storage.DriverConfig{
 			Type: "local",
 			Local: storage.LocalConfig{
@@ -133,13 +135,18 @@ func resolveStorageConfig(cfg Config) storage.DriverConfig {
 	}
 
 	if dir := os.Getenv("UPLOAD_DIR"); dir != "" {
+		// 环境变量优先，其值同样支持 ~ 展开
 		sc.Local.BaseDir = expandHome(dir)
 	} else if sc.Local.BaseDir == "" {
+		// 未显式配置本地存储目录时，退回到 UploadDir 或默认目录
 		if cfg.UploadDir != "" {
 			sc.Local.BaseDir = expandHome(cfg.UploadDir)
 		} else {
 			sc.Local.BaseDir = getDefaultUploadDir()
 		}
+	} else {
+		// 显式配置的本地目录也需要支持 ~ 展开
+		sc.Local.BaseDir = expandHome(sc.Local.BaseDir)
 	}
 
 	if sc.GitHub.Token == "" && sc.GitHub.TokenEnv != "" {
@@ -178,4 +185,3 @@ func expandHome(path string) string {
 	}
 	return expanded
 }
-

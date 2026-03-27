@@ -66,6 +66,7 @@
         showImageList: 'Show image list',
         hideImageList: 'Hide image list',
         preview: 'Preview',
+        savePreviewSettings: 'Save preview settings',
         deleteConfirm: 'Delete this image?',
         deleteFail: 'Delete failed',
         loadFail: 'Load failed',
@@ -121,6 +122,7 @@
         showImageList: '显示图片列表',
         hideImageList: '隐藏图片列表',
         preview: '预览',
+        savePreviewSettings: '保存预览设置',
         deleteConfirm: '确定删除这张图片吗？',
         deleteFail: '删除失败',
         loadFail: '加载失败',
@@ -162,11 +164,17 @@
           storageSaving: false,
           storageSaved: false,
           storageSaveError: '',
+          settingsSaving: false,
+          settingsSaved: false,
+          previewSaving: false,
+          previewSaved: false,
+          previewSaveError: '',
           imageGroups: [],
           imagesLoading: false,
           imagesError: '',
           dateFilter: new Date().toISOString().slice(0, 10),
           showImageList: false,
+          previewImageList: false,
           storagePath: '',
           configPath: '',
           pathCopied: '',
@@ -317,9 +325,86 @@
             const { payload } = unwrapApiResponse(raw);
             this.storagePath = payload?.upload_dir || '';
             this.configPath = payload?.config_file || '';
+            this.previewImageList = payload?.preview_image_list ?? false;
           } catch (_) {
             this.storagePath = '';
             this.configPath = '';
+            this.previewImageList = false;
+          }
+        },
+        async savePreviewSettings() {
+          if (this.previewSaving) return;
+          this.previewSaving = true;
+          this.previewSaved = false;
+          this.previewSaveError = '';
+          try {
+            const res = await fetch(`${this.apiBase}/settings/preview`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ preview_image_list: this.previewImageList }),
+            });
+            const raw = await res.json().catch(() => ({}));
+            const { errorMessage } = unwrapApiResponse(raw);
+            if (!res.ok) {
+              this.previewSaveError = (errorMessage || this.t.saveFail) + (res.status ? ` (${res.status})` : '');
+              return;
+            }
+            this.previewSaved = true;
+            setTimeout(() => { this.previewSaved = false; }, 1500);
+          } catch (e) {
+            this.previewSaveError = this.t.saveFail + ': ' + e.message;
+          } finally {
+            this.previewSaving = false;
+          }
+        },
+        async saveAllSettings() {
+          if (this.settingsSaving) return;
+          this.settingsSaving = true;
+          this.settingsSaved = false;
+          this.storageSaveError = '';
+          this.previewSaveError = '';
+
+          try {
+            // 1) 保存存储设置
+            {
+              const res = await fetch(`${this.apiBase}/settings/storage`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.storageConfig),
+              });
+              const raw = await res.json().catch(() => ({}));
+              const { payload, errorMessage } = unwrapApiResponse(raw);
+              if (!res.ok) {
+                this.storageSaveError = (errorMessage || this.t.saveFail) + (res.status ? ` (${res.status})` : '');
+                return;
+              }
+              if (payload) this.storageConfig = payload;
+            }
+
+            // 2) 保存图片列表预览开关
+            {
+              const res = await fetch(`${this.apiBase}/settings/preview`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ preview_image_list: this.previewImageList }),
+              });
+              const raw = await res.json().catch(() => ({}));
+              const { errorMessage } = unwrapApiResponse(raw);
+              if (!res.ok) {
+                this.previewSaveError = (errorMessage || this.t.saveFail) + (res.status ? ` (${res.status})` : '');
+                return;
+              }
+            }
+
+            this.settingsSaved = true;
+            setTimeout(() => { this.settingsSaved = false; }, 1500);
+
+            await this.loadServerInfo();
+            await this.loadImages();
+          } catch (e) {
+            this.storageSaveError = this.t.saveFail + ': ' + e.message;
+          } finally {
+            this.settingsSaving = false;
           }
         },
         async loadStorageConfig() {
@@ -596,13 +681,21 @@
                   <span>{{ t.storageSettings }}</span>
                 </div>
                 <div class="flex items-center gap-2">
-                  <button type="button" class="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs hover:bg-gray-50 disabled:opacity-50" :disabled="storageSaving" @click="saveStorageConfig">
-                    <span class="text-gray-700" v-html="iconSvg(storageSaved ? 'check' : (storageSaving ? 'loader-circle' : 'save'), storageSaving ? 'h-4 w-4 animate-spin' : 'h-4 w-4')"></span>
-                    {{ storageSaving ? t.saving : (storageSaved ? t.saved : t.save) }}
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
+                    :disabled="settingsSaving"
+                    @click="saveAllSettings"
+                  >
+                    <span class="text-gray-700" v-html="iconSvg(settingsSaved ? 'check' : (settingsSaving ? 'loader-circle' : 'save'), settingsSaving ? 'h-4 w-4 animate-spin' : 'h-4 w-4')"></span>
+                    {{ settingsSaving ? t.saving : (settingsSaved ? t.saved : t.save) }}
                   </button>
                 </div>
               </div>
-              <div v-if="storageSaveError" class="mb-2 text-xs text-red-600">{{ storageSaveError }}</div>
+              <div v-if="storageSaveError || previewSaveError" class="mb-2 text-xs text-red-600">
+                <div v-if="storageSaveError">{{ storageSaveError }}</div>
+                <div v-if="previewSaveError">{{ previewSaveError }}</div>
+              </div>
               <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div class="flex flex-col gap-1 text-[11px] text-gray-500">
                   <span>{{ t.storageType }}</span>
@@ -708,7 +801,13 @@
                   </label>
                 </template>
               </div>
-              <div class="mt-2 text-[11px] text-gray-500">token 可直接写入配置文件（也可用 token_env 读取环境变量）。</div>
+              <div class="mt-2 flex flex-col gap-1 text-[11px] text-gray-500">
+                <div>token 可直接写入配置文件（也可用 token_env 读取环境变量）。</div>
+                <label class="inline-flex items-center gap-2">
+                  <input type="checkbox" v-model="previewImageList" class="h-3.5 w-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-400" />
+                  <span>图片列表中显示缩略图预览</span>
+                </label>
+              </div>
             </div>
             <div v-if="storagePath || configPath" class="mb-3 flex flex-col gap-1.5 text-[11px]">
               <div v-if="storagePath" class="flex items-center gap-2 rounded bg-gray-100/60 px-2.5 py-1.5">
@@ -742,7 +841,7 @@
                   <div class="mb-2 mt-1 px-1 text-xs font-medium uppercase tracking-wide text-gray-500">{{ group.date }}</div>
                   <div v-for="(img, index) in group.files" :key="img.path" class="group flex flex-wrap items-center gap-2 rounded-md px-2 py-2 hover:bg-white border border-transparent hover:border-gray-200 transition-colors">
                     <div class="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-100 text-xs text-gray-400 sm:h-11 sm:w-11">
-                      <img v-if="pickUrl(img)" :src="pickUrl(img)" alt="" class="relative z-[1] h-full w-full object-cover" @error="$event.target.style.display='none'" />
+                      <img v-if="previewImageList && pickUrl(img)" :src="pickUrl(img)" alt="" class="relative z-[1] h-full w-full object-cover" @error="$event.target.style.display='none'" />
                       <span class="absolute inset-0 z-0 flex items-center justify-center">{{ index + 1 }}</span>
                     </div>
                     <div class="min-w-0 flex-1 basis-0">

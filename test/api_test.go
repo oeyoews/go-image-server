@@ -39,7 +39,7 @@ func newTestServer(t *testing.T) (*gin.Engine, string) {
 	sm := storage.NewManager(st, storage.DriverConfig{Type: "local", Local: storage.LocalConfig{BaseDir: tmpDir}})
 
 	// configPath 和 version 在测试中用不到，传空即可
-	h := upload.NewHandler(sm, "", "test")
+	h := upload.NewHandler(sm, "", "test", false)
 	fh := files.NewHandler(sm)
 
 	r := gin.Default()
@@ -229,4 +229,3 @@ func TestUploadAndDeleteImage(t *testing.T) {
 		t.Fatalf("expected status 404 on second delete, got %d", w.Code)
 	}
 }
-

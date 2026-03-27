@@ -7,21 +7,28 @@ import (
 // Handler 聚合存储实现及与上传相关的上下文信息。
 // 每个字段都与对外 API 有关，例如上传目录与配置文件路径用于 Info 接口展示。
 type Handler struct {
-	storage    *storage.Manager
-	configPath string
-	version    string
+	storage          *storage.Manager
+	configPath       string
+	version          string
+	previewImageList bool
 }
 
 // NewHandler 构造一个上传处理器实例，供 HTTP 路由注册时使用。
-func NewHandler(m *storage.Manager, configPath, version string) *Handler {
-	return &Handler{storage: m, configPath: configPath, version: version}
+func NewHandler(m *storage.Manager, configPath, version string, previewImageList bool) *Handler {
+	return &Handler{storage: m, configPath: configPath, version: version, previewImageList: previewImageList}
+}
+
+// SetPreviewImageList 允许在运行时更新图片列表预览开关，便于通过设置接口动态调整行为。
+func (h *Handler) SetPreviewImageList(v bool) {
+	h.previewImageList = v
 }
 
 // InfoResponse 服务信息响应
 type InfoResponse struct {
-	Version    string `json:"version"`
-	UploadDir  string `json:"upload_dir"`
-	ConfigFile string `json:"config_file"`
+	Version          string `json:"version"`
+	UploadDir        string `json:"upload_dir"`
+	ConfigFile       string `json:"config_file"`
+	PreviewImageList bool   `json:"preview_image_list"`
 }
 
 type UploadResponse struct {
@@ -47,4 +54,3 @@ type ImageGroup struct {
 type DeleteResult struct {
 	OK bool `json:"ok"`
 }
-

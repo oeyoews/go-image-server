@@ -23,9 +23,9 @@ func (h *Handler) Info(c *gin.Context) {
 		}
 	}
 	respOK(c, InfoResponse{
-		Version:    h.version,
-		UploadDir:  uploadDir,
-		ConfigFile: h.configPath,
+		Version:          h.version,
+		UploadDir:        uploadDir,
+		ConfigFile:       h.configPath,
+		PreviewImageList: h.previewImageList,
 	})
 }
-

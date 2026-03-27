@@ -85,7 +85,7 @@ func run() {
 	}
 
 	sm := storage.NewManager(st, storageCfg)
-	h := upload.NewHandler(sm, cfgPath, Version)
+	h := upload.NewHandler(sm, cfgPath, Version, cfg.PreviewImageList)
 	fh := files.NewHandler(sm)
 
 	r := gin.Default()
@@ -123,6 +123,35 @@ func run() {
 				return
 			}
 			c.JSON(http.StatusOK, upload.APIResponse{Code: http.StatusOK, Message: "success", Data: sc})
+		})
+
+		// UI 相关设置，目前仅包含图片列表是否预览缩略图
+		apiV1.PUT("/settings/preview", func(c *gin.Context) {
+			var body struct {
+				PreviewImageList *bool `json:"preview_image_list"`
+			}
+			if err := c.ShouldBindJSON(&body); err != nil {
+				c.JSON(http.StatusBadRequest, upload.APIResponse{Code: http.StatusBadRequest, Message: err.Error(), Data: nil})
+				return
+			}
+			if body.PreviewImageList == nil {
+				c.JSON(http.StatusBadRequest, upload.APIResponse{Code: http.StatusBadRequest, Message: "preview_image_list is required", Data: nil})
+				return
+			}
+			cfg.PreviewImageList = *body.PreviewImageList
+			// 同步更新到处理器实例，保证 /info 接口与运行时行为一致
+			h.SetPreviewImageList(cfg.PreviewImageList)
+			if err := writeConfig(cfgPath, cfg); err != nil {
+				c.JSON(http.StatusInternalServerError, upload.APIResponse{Code: http.StatusInternalServerError, Message: err.Error(), Data: nil})
+				return
+			}
+			c.JSON(http.StatusOK, upload.APIResponse{
+				Code:    http.StatusOK,
+				Message: "success",
+				Data: map[string]any{
+					"preview_image_list": cfg.PreviewImageList,
+				},
+			})
 		})
 	}
 
@@ -174,4 +203,3 @@ func run() {
 		break
 	}
 }
-
